@@ -1,0 +1,939 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Powder 3D Printer Cost Calculator</title>
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Material Icons -->
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  
+  <!-- Three.js Library - Updated versions and proper loading order -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/STLLoader.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  
+  <!-- GSAP for smooth animations -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.11.4/gsap.min.js"></script>
+  
+  <style>
+    :root {
+      --primary: #3a86ff;
+      --primary-dark: #2667cc;
+      --secondary: #8338ec;
+      --success: #38b000;
+      --danger: #e63946;
+      --warning: #ffbe0b;
+      --info: #3a86ff;
+      --light: #f8f9fa;
+      --dark: #212529;
+      --gray-100: #f8f9fa;
+      --gray-200: #e9ecef;
+      --gray-300: #dee2e6;
+      --gray-400: #ced4da;
+      --gray-500: #adb5bd;
+      --gray-600: #6c757d;
+      --gray-700: #495057;
+      --gray-800: #343a40;
+      --gray-900: #212529;
+      
+      --shadow-sm: 0 2px 4px rgba(0,0,0,0.05);
+      --shadow: 0 4px 6px rgba(0,0,0,0.07);
+      --shadow-lg: 0 10px 15px rgba(0,0,0,0.1);
+      
+      --radius-sm: 4px;
+      --radius: 8px;
+      --radius-lg: 12px;
+      
+      --transition: all 0.2s ease;
+      
+      --container-width: 1200px;
+    }
+    
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: linear-gradient(135deg, #f6f9fc, #edf2f7);
+      color: var(--gray-800);
+      min-height: 100vh;
+      line-height: 1.6;
+      padding: 1rem;
+      -webkit-font-feature-settings: "liga" 1;
+      font-feature-settings: "liga" 1;
+    }
+    
+    .container {
+      max-width: var(--container-width);
+      margin: 0 auto;
+    }
+    
+    header {
+      margin-bottom: 2rem;
+      text-align: center;
+    }
+    
+    h1 {
+      font-weight: 700;
+      font-size: 2.2rem;
+      color: var(--gray-900);
+      margin-bottom: 0.5rem;
+    }
+    
+    h2 {
+      font-weight: 600;
+      font-size: 1.5rem;
+      color: var(--gray-800);
+      margin-bottom: 1rem;
+    }
+    
+    h3 {
+      font-weight: 600;
+      font-size: 1.2rem;
+      color: var(--gray-800);
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    .subheading {
+      color: var(--gray-600);
+      font-weight: 400;
+      font-size: 1.1rem;
+    }
+    
+    /* Cards */
+    .card {
+      background-color: white;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      transition: var(--transition);
+    }
+    
+    .card:hover {
+      box-shadow: var(--shadow-lg);
+    }
+    
+    /* Global Settings Card */
+    .settings-card {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+      align-items: start;
+    }
+    
+    .settings-section {
+      flex: 1;
+      min-width: 280px;
+    }
+    
+    .currency-selector {
+      margin-bottom: 1rem;
+    }
+    
+    /* Form Controls */
+    label {
+      display: block;
+      font-size: 0.9rem;
+      font-weight: 500;
+      margin-bottom: 0.5rem;
+      color: var(--gray-700);
+    }
+    
+    select, input {
+      width: 100%;
+      padding: 0.65rem 0.8rem;
+      font-size: 0.95rem;
+      border: 1px solid var(--gray-300);
+      border-radius: var(--radius-sm);
+      background-color: white;
+      color: var(--gray-800);
+      transition: var(--transition);
+      font-family: inherit;
+    }
+    
+    select:focus, input:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(58, 134, 255, 0.2);
+    }
+    
+    .form-group {
+      margin-bottom: 1rem;
+    }
+    
+    .input-group {
+      display: flex;
+      align-items: center;
+    }
+    
+    .input-group input {
+      flex: 1;
+      border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+    }
+    
+    .input-group-append {
+      padding: 0.65rem 0.8rem;
+      background-color: var(--gray-200);
+      border: 1px solid var(--gray-300);
+      border-left: none;
+      border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+      color: var(--gray-600);
+      font-size: 0.9rem;
+    }
+    
+    /* Buttons */
+    .btn {
+      display: inline-block;
+      font-weight: 500;
+      text-align: center;
+      vertical-align: middle;
+      user-select: none;
+      border: 1px solid transparent;
+      padding: 0.65rem 1.2rem;
+      font-size: 0.95rem;
+      line-height: 1.5;
+      border-radius: var(--radius-sm);
+      transition: var(--transition);
+      cursor: pointer;
+    }
+    
+    .btn-primary {
+      background-color: var(--primary);
+      color: white;
+    }
+    
+    .btn-primary:hover {
+      background-color: var(--primary-dark);
+    }
+    
+    .btn-success {
+      background-color: var(--success);
+      color: white;
+    }
+    
+    .btn-success:hover {
+      background-color: #2d9000;
+    }
+    
+    .btn-danger {
+      background-color: var(--danger);
+      color: white;
+    }
+    
+    .btn-danger:hover {
+      background-color: #c52933;
+    }
+    
+    .btn-sm {
+      padding: 0.4rem 0.8rem;
+      font-size: 0.85rem;
+    }
+    
+    /* STL Upload Area */
+    .stl-rows {
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+    }
+    
+    .stl-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1.5rem;
+    }
+    
+    .stl-col {
+      flex: 1;
+      min-width: 320px;
+    }
+    
+    .upload-area {
+      border: 2px dashed var(--gray-300);
+      border-radius: var(--radius);
+      padding: 2rem;
+      text-align: center;
+      background-color: var(--gray-100);
+      transition: var(--transition);
+      cursor: pointer;
+      margin-bottom: 1rem;
+    }
+    
+    .upload-area:hover, .upload-area.dragover {
+      border-color: var(--primary);
+      background-color: rgba(58, 134, 255, 0.05);
+    }
+    
+    .upload-area p {
+      margin-bottom: 0.5rem;
+      color: var(--gray-600);
+    }
+    
+    .upload-icon {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+      color: var(--gray-500);
+    }
+    
+    /* 3D Viewer */
+    .model-viewer {
+      width: 100%;
+      height: 300px;
+      border-radius: var(--radius);
+      overflow: hidden;
+      background-color: #f0f2f5;
+      display: none;
+      position: relative;
+    }
+    
+    .model-viewer-loading {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(240, 242, 245, 0.8);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 10;
+    }
+    
+    /* Orientation Toggle Buttons */
+    .orientation-toggle {
+      display: flex;
+      margin-top: 0.5rem;
+      margin-bottom: 1rem;
+      gap: 0.5rem;
+    }
+    
+    .orientation-btn {
+      flex: 1;
+      padding: 0.5rem;
+      background-color: var(--gray-200);
+      border: 1px solid var(--gray-300);
+      border-radius: var(--radius-sm);
+      font-size: 0.9rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: var(--transition);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    
+    .orientation-btn.active {
+      background-color: var(--primary);
+      color: white;
+      border-color: var(--primary-dark);
+    }
+    
+    .orientation-btn:hover:not(.active) {
+      background-color: var(--gray-300);
+    }
+    
+    .orientation-btn .material-icon {
+      font-size: 18px;
+      margin-right: 4px;
+    }
+    
+    /* Results Panel */
+    .results-panel {
+      display: none;
+    }
+    
+    .total-cost {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--primary);
+      margin: 1rem 0;
+      text-align: center;
+    }
+    
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 1rem;
+      margin: 1.5rem 0;
+    }
+    
+    .stat-box {
+      background-color: var(--gray-100);
+      border-radius: var(--radius-sm);
+      padding: 1rem;
+      text-align: center;
+    }
+    
+    .stat-value {
+      font-size: 1.2rem;
+      font-weight: 600;
+      color: var(--gray-900);
+      margin-bottom: 0.25rem;
+    }
+    
+    .stat-label {
+      font-size: 0.85rem;
+      color: var(--gray-600);
+    }
+    
+    /* Progress Bars */
+    .progress-container {
+      margin: 1.5rem 0;
+    }
+    
+    .progress-item {
+      margin-bottom: 1rem;
+    }
+    
+    .progress-header {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.85rem;
+      margin-bottom: 0.35rem;
+    }
+    
+    .progress-label {
+      font-weight: 500;
+      color: var(--gray-700);
+    }
+    
+    .progress-value {
+      color: var(--gray-600);
+    }
+    
+    .progress-bar {
+      height: 10px;
+      background-color: var(--gray-200);
+      border-radius: 5px;
+      overflow: hidden;
+    }
+    
+    .progress-fill {
+      height: 100%;
+      border-radius: 5px;
+      transition: width 0.4s ease;
+    }
+    
+    /* Printer Calculations */
+    .printer-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1rem;
+      margin-top: 1.5rem;
+    }
+    
+    .printer-card {
+      background-color: var(--gray-100);
+      border-radius: var(--radius);
+      padding: 1.2rem;
+    }
+    
+    .printer-title {
+      font-weight: 600;
+      font-size: 1.1rem;
+      margin-bottom: 0.75rem;
+      color: var(--gray-800);
+    }
+    
+    .printer-stats {
+      font-size: 0.9rem;
+      color: var(--gray-700);
+    }
+    
+    .printer-stats p {
+      margin-bottom: 0.5rem;
+    }
+    
+    .printer-highlight {
+      font-weight: 700;
+      font-size: 1.5rem;
+      color: var(--primary);
+      display: block;
+      margin-bottom: 0.3rem;
+    }
+    
+    /* Packing Visualizers */
+    .packing-visualizers {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+      gap: 1rem;
+      margin-top: 1rem;
+    }
+    
+    .packing-visualizer {
+      height: 200px;
+      border-radius: var(--radius-sm);
+      background-color: white;
+      overflow: hidden;
+      box-shadow: var(--shadow-sm);
+      position: relative;
+    }
+    
+    /* Collapsible Advanced Settings */
+    .advanced-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: var(--gray-600);
+      cursor: pointer;
+      margin-top: 0.5rem;
+      user-select: none;
+    }
+    
+    .advanced-toggle:hover {
+      color: var(--primary);
+    }
+    
+    .advanced-toggle-icon {
+      transition: transform 0.2s ease;
+    }
+    
+    .advanced-toggle.open .advanced-toggle-icon {
+      transform: rotate(180deg);
+    }
+    
+    .advanced-settings {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s ease;
+    }
+    
+    .advanced-settings.open {
+      max-height: 500px;
+    }
+    
+    /* Checkbox toggle for glaze */
+    .toggle-container {
+      display: flex;
+      align-items: center;
+      margin: 1rem 0;
+    }
+    
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 48px;
+      height: 24px;
+      margin-right: 0.75rem;
+    }
+    
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    
+    .toggle-slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: var(--gray-300);
+      transition: 0.4s;
+      border-radius: 24px;
+    }
+    
+    .toggle-slider:before {
+      position: absolute;
+      content: "";
+      height: 18px;
+      width: 18px;
+      left: 3px;
+      bottom: 3px;
+      background-color: white;
+      transition: 0.4s;
+      border-radius: 50%;
+    }
+    
+    input:checked + .toggle-slider {
+      background-color: var(--primary);
+    }
+    
+    input:checked + .toggle-slider:before {
+      transform: translateX(24px);
+    }
+    
+    .toggle-label {
+      font-size: 0.95rem;
+      font-weight: 500;
+      color: var(--gray-700);
+    }
+    
+    /* Error Message */
+    .error-message {
+      color: var(--danger);
+      text-align: center;
+      margin: 1rem 0;
+      font-size: 0.95rem;
+      display: none;
+    }
+    
+    /* Add/Remove Buttons */
+    .row-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.75rem;
+      margin-top: 1.5rem;
+    }
+    
+    /* Tab Navigation */
+    .tab-nav {
+      display: flex;
+      border-bottom: 1px solid var(--gray-300);
+      margin-bottom: 1.5rem;
+    }
+    
+    .tab-btn {
+      padding: 0.75rem 1.5rem;
+      background: none;
+      border: none;
+      border-bottom: 3px solid transparent;
+      font-weight: 500;
+      font-size: 1rem;
+      color: var(--gray-600);
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    
+    .tab-btn.active {
+      color: var(--primary);
+      border-bottom-color: var(--primary);
+    }
+    
+    .tab-btn:hover:not(.active) {
+      color: var(--gray-800);
+      border-bottom-color: var(--gray-300);
+    }
+    
+    .tab-content {
+      display: none;
+    }
+    
+    .tab-content.active {
+      display: block;
+    }
+    
+    /* Material icons */
+    .material-icon {
+      font-family: 'Material Icons';
+      font-weight: normal;
+      font-style: normal;
+      font-size: 24px;
+      line-height: 1;
+      letter-spacing: normal;
+      text-transform: none;
+      display: inline-block;
+      white-space: nowrap;
+      word-wrap: normal;
+      direction: ltr;
+      -webkit-font-feature-settings: 'liga';
+      font-feature-settings: 'liga';
+      -webkit-font-smoothing: antialiased;
+    }
+    
+    /* Loading Spinner */
+    .spinner {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(58, 134, 255, 0.3);
+      border-radius: 50%;
+      border-top-color: var(--primary);
+      animation: spin 1s linear infinite;
+      margin-right: 8px;
+    }
+    
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+    
+    .loading-message {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.95rem;
+      color: var(--gray-600);
+      margin: 1rem 0;
+    }
+    
+    /* Axis Label Styles */
+    .axis-label {
+      font-family: 'Inter', sans-serif;
+      font-weight: 600;
+      font-size: 14px;
+    }
+    
+    /* Responsive Adjustments */
+    @media (max-width: 768px) {
+      .settings-card {
+        flex-direction: column;
+      }
+      
+      .stats-grid {
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      }
+      
+      .printer-cards {
+        grid-template-columns: 1fr;
+      }
+    }
+    
+    /* Memory warning */
+    .memory-warning {
+      background-color: #fff3cd;
+      border: 1px solid #ffeeba;
+      border-radius: var(--radius-sm);
+      padding: 0.75rem;
+      margin-bottom: 1rem;
+      color: #856404;
+      font-size: 0.9rem;
+      display: none;
+    }
+    
+    /* Model viewer controls */
+    .viewer-controls {
+      position: absolute;
+      bottom: 10px;
+      right: 10px;
+      display: flex;
+      gap: 5px;
+      z-index: 5;
+    }
+    
+    .viewer-control-btn {
+      background-color: rgba(255, 255, 255, 0.8);
+      border: 1px solid var(--gray-300);
+      border-radius: var(--radius-sm);
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: var(--transition);
+    }
+    
+    .viewer-control-btn:hover {
+      background-color: white;
+      box-shadow: var(--shadow-sm);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Powder 3D Printer Cost Calculator</h1>
+      <p class="subheading">Calculate material costs and optimize printer capacity</p>
+    </header>
+    
+    <!-- Global Settings Card -->
+    <div class="card">
+      <div class="settings-card">
+        <div class="settings-section">
+          <h3>
+            <span class="material-icon">monetization_on</span>
+            Currency Settings
+          </h3>
+          <div class="form-group currency-selector">
+            <label for="currency">Select Currency</label>
+            <select id="currency" class="form-control">
+              <option value="USD">USD ($)</option>
+              <option value="EUR">EUR (€)</option>
+              <option value="JPY">JPY (¥)</option>
+              <option value="SGD">SGD (S$)</option>
+            </select>
+          </div>
+          
+          <div class="advanced-toggle">
+            <span>Advanced Pricing Settings</span>
+            <span class="material-icon advanced-toggle-icon">expand_more</span>
+          </div>
+          
+          <div class="advanced-settings">
+            <div class="form-group">
+              <label for="pricePowder">Powder Price per kg</label>
+              <div class="input-group">
+                <input type="number" id="pricePowder" step="0.001" min="0">
+                <span class="input-group-append" id="powder-currency">USD</span>
+              </div>
+            </div>
+            
+            <div class="form-group">
+              <label for="priceBinder">Binder Price per mL</label>
+              <div class="input-group">
+                <input type="number" id="priceBinder" step="0.001" min="0">
+                <span class="input-group-append" id="binder-currency">USD</span>
+              </div>
+            </div>
+            
+            <div class="form-group">
+              <label for="priceSilica">Silica Price per g</label>
+              <div class="input-group">
+                <input type="number" id="priceSilica" step="0.001" min="0">
+                <span class="input-group-append" id="silica-currency">USD</span>
+              </div>
+            </div>
+            
+            <div class="form-group">
+              <label for="priceGlaze">Glaze Price per g</label>
+              <div class="input-group">
+                <input type="number" id="priceGlaze" step="0.001" min="0">
+                <span class="input-group-append" id="glaze-currency">USD</span>
+              </div>
+            </div>
+            
+            <button id="updatePricing" class="btn btn-primary btn-sm">Update Pricing</button>
+          </div>
+        </div>
+        
+        <div class="settings-section">
+          <h3>
+            <span class="material-icon">settings</span>
+            Printer Settings
+          </h3>
+          
+          <div class="form-group">
+            <label for="wallMargin">Wall Margin (mm)</label>
+            <input type="number" id="wallMargin" value="10" min="0" max="50">
+          </div>
+          
+          <div class="form-group">
+            <label for="objectSpacing">Object Spacing (mm)</label>
+            <input type="number" id="objectSpacing" value="15" min="0" max="50">
+          </div>
+          
+          <button id="updateSettings" class="btn btn-primary btn-sm">Apply Settings</button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Tab Navigation -->
+    <div class="tab-nav">
+      <button class="tab-btn active" data-tab="upload">STL Upload</button>
+      <button class="tab-btn" data-tab="manual">Manual Input</button>
+    </div>
+    
+    <!-- STL Upload Tab -->
+    <div id="upload-tab" class="tab-content active">
+      <div class="memory-warning">
+        <strong>Note:</strong> Large STL files may affect performance. For best results, use optimized STL files under 50MB.
+      </div>
+      
+      <!-- STL Rows Container -->
+      <div id="stlRows" class="stl-rows">
+        <!-- STL rows will be added here -->
+      </div>
+      
+      <!-- Add New STL Button -->
+      <button id="addNewStl" class="btn btn-primary">
+        <span class="material-icon">add</span> New STL
+      </button>
+    </div>
+    
+    <!-- Manual Input Tab Section - Remove orientation toggle -->
+<div id="manual-tab" class="tab-content">
+    <div class="card">
+      <h3>
+        <span class="material-icon">edit</span>
+        STL Details
+      </h3>
+      <div class="form-group">
+        <label for="volume">Volume (cm³)</label>
+        <input type="number" id="volume" min="0" step="0.01" value="100">
+      </div>
+      
+      <div class="form-group">
+        <label for="width">Width (mm)</label>
+        <input type="number" id="width" min="0" step="0.1" value="50">
+      </div>
+      
+      <div class="form-group">
+        <label for="depth">Depth (mm)</label>
+        <input type="number" id="depth" min="0" step="0.1" value="50">
+      </div>
+      
+      <div class="form-group">
+        <label for="height">Height (mm)</label>
+        <input type="number" id="height" min="0" step="0.1" value="50">
+      </div>
+      
+      <!-- Orientation toggle removed -->
+      
+      <button id="calculateBtn" class="btn btn-primary">Calculate Costs</button>
+    </div>
+    
+    <!-- Results Panel for Manual Input -->
+    <div id="manual-results" class="results-panel">
+      <h3>
+        <span class="material-icon">analytics</span>
+        Cost Analysis
+      </h3>
+      
+      <div class="total-cost" id="manual-total-cost">$0.00</div>
+      
+      <div class="stats-grid">
+        <div class="stat-box">
+          <div class="stat-value" id="volume-display">100.00</div>
+          <div class="stat-label">Volume (cm³)</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-value" id="dimensions-display">50.0 × 50.0 × 50.0</div>
+          <div class="stat-label">Dimensions (mm)</div>
+        </div>
+      </div>
+      
+      <div class="toggle-container">
+        <label class="toggle-switch">
+          <input type="checkbox" id="manual-glazeToggle" checked>
+          <span class="toggle-slider"></span>
+        </label>
+        <span class="toggle-label">Apply Glaze</span>
+      </div>
+      
+      <div class="progress-container" id="manual-costBreakdown"></div>
+      
+      <h3>
+        <span class="material-icon">view_in_ar</span>
+        Printer Capacity
+      </h3>
+      
+      <div class="printer-cards">
+        <div class="printer-card">
+          <div class="printer-title">Printer 400</div>
+          <div class="printer-stats" id="manual-printer400-stats">
+            <p>Calculating...</p>
+          </div>
+        </div>
+        
+        <div class="printer-card">
+          <div class="printer-title">Printer 600</div>
+          <div class="printer-stats" id="manual-printer600-stats">
+            <p>Calculating...</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  
+  <!-- JavaScript loader -->
+  <script src="powder-calc-main.js"></script>
+<script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'919f43589a1ad3ce',t:'MTc0MDkwMTQwNS4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
