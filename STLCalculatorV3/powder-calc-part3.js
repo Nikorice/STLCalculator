@@ -308,6 +308,7 @@ function setupViewerControls(container, scene, camera, controls, renderer) {
 }
   
 // Enhanced version of displayGeometry that makes the STL object sit on a flat grid
+// Enhanced version of displayGeometry that makes the STL object sit on the grid
 function displayGeometry(geometry, scene, camera, controls) {
     perfMonitor.start('displayModel');
   
@@ -387,8 +388,8 @@ function displayGeometry(geometry, scene, camera, controls) {
       });
       gsap.to(controls.target, {
         x: 0,
-        y: 0,
-        z: size.z / 2,
+        y: size.y / 2,
+        z: 0,
         duration: 1.2,
         ease: "power2.inOut",
         onUpdate: function() {
@@ -397,20 +398,16 @@ function displayGeometry(geometry, scene, camera, controls) {
       });
     } else {
       camera.position.set(distance, distance, distance);
-      controls.target.set(0, 0, size.z / 2);
-      camera.lookAt(0, 0, size.z / 2);
+      controls.target.set(0, size.y / 2, 0);
+      camera.lookAt(0, size.y / 2, 0);
       controls.update();
     }
   
-    // Add enhanced axis helpers (remains unchanged)
-    addEnhancedAxisHelpers(scene, Math.max(maxDim, 20));
-  
-    // Add a flat grid helper on the XZ plane.
+    // Add grid for better spatial reference
     const gridSize = Math.max(maxDim * 2, 50);
     const gridDivisions = 20;
     const gridHelper = new THREE.GridHelper(gridSize, gridDivisions, 0x3a86ff, 0xd1d5db);
     gridHelper.position.y = 0;  // Place grid at y = 0 (the floor)
-    gridHelper.rotation.x = 0;  // Ensure grid is not rotated (remains on XZ)
     scene.add(gridHelper);
   
     // Save data in scene.userData for later use if needed
@@ -659,7 +656,7 @@ function changeOrientation(scene, camera, controls, orientationType) {
     return orientationData;
 }
   
-// Enhanced packing visualization with clearer layout and labels
+// Enhanced packing visualization with clearer layout and minimal labels
 function visualizePacking(printer, objWidth, objDepth, objHeight, positions, container, stlGeometry, orientationType) {
     perfMonitor.start('visualizePacking');
     
@@ -760,7 +757,7 @@ function visualizePacking(printer, objWidth, objDepth, objHeight, positions, con
       scene.add(dirLight);
       
       // Create printer outline
-      createEnhancedPrinterOutline(scene, printer, isDarkMode);
+      createPrinterOutline(scene, printer, isDarkMode);
       
       // Create base plate with better visual appearance
       const basePlateGeom = new THREE.BoxGeometry(printer.width, printer.depth, 1);
@@ -1038,8 +1035,8 @@ function visualizePacking(printer, objWidth, objDepth, objHeight, positions, con
     perfMonitor.end('visualizePacking');
 }
   
-// Create enhanced printer outline
-function createEnhancedPrinterOutline(scene, printer, isDarkMode) {
+// Create minimalist printer outline
+function createPrinterOutline(scene, printer, isDarkMode) {
     const w = printer.width;
     const d = printer.depth;
     const h = printer.height;
@@ -1084,132 +1081,71 @@ function createEnhancedPrinterOutline(scene, printer, isDarkMode) {
       line.computeLineDistances(); // Required for dashed lines
       scene.add(line);
     });
-    
-    // Add corner spheres for better visual appearance
-    const corners = [
-      [0, 0, 0], [w, 0, 0], [w, d, 0], [0, d, 0],
-      [0, 0, h], [w, 0, h], [w, d, h], [0, d, h]
-    ];
-    
-    const cornerMaterial = new THREE.MeshBasicMaterial({
-      color: isDarkMode ? 0x94a3b8 : 0x64748b,
-      opacity: 0.8,
-      transparent: true
-    });
-    
-    corners.forEach(corner => {
-      const cornerGeometry = new THREE.SphereGeometry(2, 8, 8);
-      const cornerMesh = new THREE.Mesh(cornerGeometry, cornerMaterial);
-      cornerMesh.position.set(...corner);
-      scene.add(cornerMesh);
-    });
-    
-    // Add dimension lines
-    const dimLineMaterial = new THREE.LineBasicMaterial({
-      color: isDarkMode ? 0x60a5fa : 0x3b82f6,
-      opacity: 0.8,
-      transparent: true,
-      linewidth: 2
-    });
-    
-    // Width dimension line (with text)
-    const widthPoints = [
-      new THREE.Vector3(0, -10, 0),
-      new THREE.Vector3(w, -10, 0)
-    ];
-    const widthGeometry = new THREE.BufferGeometry().setFromPoints(widthPoints);
-    const widthLine = new THREE.Line(widthGeometry, dimLineMaterial);
-    scene.add(widthLine);
-    
-    // Depth dimension line
-    const depthPoints = [
-      new THREE.Vector3(-10, 0, 0),
-      new THREE.Vector3(-10, d, 0)
-    ];
-    const depthGeometry = new THREE.BufferGeometry().setFromPoints(depthPoints);
-    const depthLine = new THREE.Line(depthGeometry, dimLineMaterial);
-    scene.add(depthLine);
-    
-    // Height dimension line
-    const heightPoints = [
-      new THREE.Vector3(-10, -10, 0),
-      new THREE.Vector3(-10, -10, h)
-    ];
-    const heightGeometry = new THREE.BufferGeometry().setFromPoints(heightPoints);
-    const heightLine = new THREE.Line(heightGeometry, dimLineMaterial);
-    scene.add(heightLine);
 }
 
-// Apply orientation to mesh (resets from original geometry)
+// Improved applyOrientation function that properly rotates without stretching
 function applyOrientation(mesh, originalSize, orientationType) {
-    console.log(`Applying orientation: ${orientationType}`);
-    
-    // Reset mesh
+    // Reset mesh transforms
     mesh.rotation.set(0, 0, 0);
     mesh.position.set(0, 0, 0);
     mesh.scale.set(1, 1, 1);
     mesh.updateMatrix();
-    
-    // Get a clean copy of the original geometry
-    const baseGeometry = mesh.userData.originalGeometry
-      ? mesh.userData.originalGeometry.clone()
-      : mesh.geometry.clone();
-    
-    // Find dimensions and their corresponding axes
+  
+    // Get a fresh copy of the original geometry
+    const baseGeometry = mesh.userData.originalGeometry 
+        ? mesh.userData.originalGeometry.clone() 
+        : mesh.geometry.clone();
+  
+    // Determine original dimensions along each axis
     const dimensions = [
       { axis: 'x', value: originalSize.x },
       { axis: 'y', value: originalSize.y },
       { axis: 'z', value: originalSize.z }
     ];
-    
+    // Sort descending so that the first element has the longest dimension
     dimensions.sort((a, b) => b.value - a.value);
     const longestAxis = dimensions[0].axis;
-    const shortestAxis = dimensions[2].axis;
-    
-    // Create a rotation matrix
+  
+    // Prepare a rotation matrix to change the orientation
     let rotMatrix = new THREE.Matrix4();
-    
     if (orientationType === "vertical") {
-      // We want the longest dimension on the Z axis
+      // We want the longest dimension to align with the Z-axis.
       if (longestAxis === 'x') {
-        rotMatrix.makeRotationX(0);
-        rotMatrix.multiply(new THREE.Matrix4().makeRotationZ(-Math.PI/2));
+        // Rotate around Y by -90° so X becomes Z.
+        rotMatrix.makeRotationY(-Math.PI / 2);
       } else if (longestAxis === 'y') {
-        rotMatrix.makeRotationY(0);
-        rotMatrix.multiply(new THREE.Matrix4().makeRotationX(Math.PI/2));
+        // Rotate around X by +90° so Y becomes Z.
+        rotMatrix.makeRotationX(Math.PI / 2);
       } else {
-        // Already on Z, no rotation needed
+        // If already along Z, no rotation is needed.
         rotMatrix.identity();
       }
-    } else {
-      // "flat" orientation - shortest dimension on Z
-      if (shortestAxis === 'x') {
-        rotMatrix.makeRotationY(Math.PI/2);
-      } else if (shortestAxis === 'y') {
-        rotMatrix.makeRotationX(Math.PI/2);
+    } else { // "flat" orientation
+      // For a flat print, we want the longest dimension to lie in the XY plane.
+      if (longestAxis === 'z') {
+        // Rotate around X by -90° so that Z is rotated into the Y direction.
+        rotMatrix.makeRotationX(-Math.PI / 2);
       } else {
-        // Already on Z, no rotation needed
         rotMatrix.identity();
       }
     }
-    
-    // Apply rotation
+  
+    // Apply the rotation to the geometry
     baseGeometry.applyMatrix4(rotMatrix);
-    
-    // Replace mesh geometry
     mesh.geometry.dispose();
     mesh.geometry = baseGeometry;
-    
-    // Center the geometry on the XY plane with bottom at Z=0
+  
+    // Recompute bounding box and center the mesh so that its lowest point is at z = 0.
     baseGeometry.computeBoundingBox();
     const bbox = baseGeometry.boundingBox;
     const center = new THREE.Vector3();
     bbox.getCenter(center);
-    
+    // Center in X and Y, and shift in Z so that the minimum Z becomes 0.
     mesh.position.set(-center.x, -center.y, -bbox.min.z);
-    
+  
     return baseGeometry;
-}
+  }
+  
   
 // Determine the optimal orientation for an object (longest dimension = vertical or default to flat, etc.)
 function determineOptimalOrientation(width, depth, height) {
