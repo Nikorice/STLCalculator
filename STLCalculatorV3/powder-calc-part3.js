@@ -673,10 +673,11 @@ function displayGeometry(geometry, scene, camera, controls) {
   ) {
     perfMonitor.start('visualizePacking');
     
-    // Clean up old renderer
+    // Clean up old renderer and resources completely
     if (container.cleanup) {
       container.cleanup();
     }
+    
     while (container.firstChild) {
       container.removeChild(container.firstChild);
     }
@@ -700,6 +701,167 @@ function displayGeometry(geometry, scene, camera, controls) {
       return;
     }
     
+    // Check for dark mode
+    const isDarkMode = document.documentElement.getAttribute('data-theme') === 'dark';
+    
+    try {
+      // Create renderer with more conservative settings
+      const renderer = new THREE.WebGLRenderer({ 
+        antialias: false, // Disable antialiasing for better performance
+        alpha: true,
+        powerPreference: 'default',
+        precision: 'lowp'  // Use low precision for better performance
+      });
+      
+      renderer.setSize(container.clientWidth, container.clientHeight);
+      renderer.setClearColor(isDarkMode ? 0x1e293b : 0xffffff, 1);
+      container.appendChild(renderer.domElement);
+      
+      // Create scene
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(isDarkMode ? 0x1e293b : 0xffffff);
+      
+      // Use orthographic camera with simpler settings
+      const aspect = container.clientWidth / container.clientHeight;
+      const frustumSize = Math.max(printer.width, printer.depth, printer.height) * 1.2;
+      
+      const camera = new THREE.OrthographicCamera(
+        frustumSize * aspect / -2, 
+        frustumSize * aspect / 2,
+        frustumSize / 2, 
+        frustumSize / -2,
+        0.1, 
+        1000
+      );
+      
+      const isoDist = Math.max(printer.width, printer.depth, printer.height) * 0.7;
+      camera.position.set(isoDist, -isoDist, isoDist);
+      camera.lookAt(printer.width/2, printer.depth/2, printer.height/2);
+      
+      // Add simpler controls with less demanding settings
+      const controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = false; // Disable damping for better performance
+      controls.minZoom = 0.5;
+      controls.maxZoom = 2;
+      controls.target.set(printer.width/2, printer.depth/2, printer.height/2);
+      controls.update();
+      
+      // Simpler lighting setup
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+      scene.add(ambientLight);
+      
+      const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
+      dirLight.position.set(isoDist, -isoDist, isoDist);
+      scene.add(dirLight);
+      
+      // Create printer outline with improved performance
+      createEnhancedPrinterOutline(scene, printer, isDarkMode);
+      
+      // Create base plate with better visual appearance
+      const basePlateGeom = new THREE.BoxGeometry(printer.width, printer.depth, 1);
+      const basePlateMat = new THREE.MeshBasicMaterial({  // Use MeshBasicMaterial instead of PhongMaterial
+        color: isDarkMode ? 0x334155 : 0xf1f5f9,
+        opacity: 0.7,
+        transparent: true
+      });
+      const basePlate = new THREE.Mesh(basePlateGeom, basePlateMat);
+      basePlate.position.set(printer.width/2, printer.depth/2, 0.5);
+      scene.add(basePlate);
+      
+      // Rest of the function remains the same...
+      
+      // But modify the rendering loop for better performance
+      let animationId;
+      let active = true;
+      
+      function animate() {
+        if (!active) return;
+        
+        animationId = requestAnimationFrame(animate);
+        controls.update();
+        renderer.render(scene, camera);
+        
+        // Update label positions (if needed)
+        if (labels && labels.length > 0) {
+          labels.forEach(label => {
+            const screenPos = label.position.clone().project(camera);
+            label.element.style.left = `${(screenPos.x * 0.5 + 0.5) * container.clientWidth}px`;
+            label.element.style.top = `${(-screenPos.y * 0.5 + 0.5) * container.clientHeight}px`;
+          });
+        }
+      }
+      
+      // Start animation with a short delay
+      setTimeout(() => {
+        animate();
+      }, 100);
+      
+      // Improved cleanup function that completely removes all resources
+      container.cleanup = () => {
+        active = false;
+        if (animationId) {
+          cancelAnimationFrame(animationId);
+        }
+        
+        if (resizeObserver) {
+          resizeObserver.disconnect();
+        }
+        
+        document.removeEventListener('themeChanged', themeChangeListener);
+        
+        if (labels && labels.length > 0) {
+          labels.forEach(label => {
+            if (label.element && label.element.parentNode) {
+              label.element.parentNode.removeChild(label.element);
+            }
+          });
+        }
+        
+        // Dispose of all scene objects
+        scene.traverse(obj => {
+          if (obj.geometry) obj.geometry.dispose();
+          if (obj.material) {
+            if (Array.isArray(obj.material)) {
+              obj.material.forEach(m => m.dispose());
+            } else {
+              obj.material.dispose();
+            }
+          }
+        });
+        
+        // Dispose of renderer
+        if (renderer) {
+          renderer.dispose();
+          if (renderer.domElement && renderer.domElement.parentNode) {
+            renderer.domElement.parentNode.removeChild(renderer.domElement);
+          }
+        }
+        
+        // Clear THREE.js cache
+        THREE.Cache.clear();
+      };
+      
+      perfMonitor.end('visualizePacking');
+    } catch (error) {
+      console.error("Error in visualizePacking:", error);
+      
+      // Display fallback message if visualization fails
+      const errorMessage = document.createElement("div");
+      errorMessage.style.height = "100%";
+      errorMessage.style.display = "flex";
+      errorMessage.style.flexDirection = "column";
+      errorMessage.style.alignItems = "center";
+      errorMessage.style.justifyContent = "center";
+      errorMessage.style.fontSize = "14px";
+      errorMessage.style.color = "var(--danger)";
+      errorMessage.innerHTML = `
+        <span class="material-icon" style="font-size: 36px; margin-bottom: 8px;">error_outline</span>
+        <span>Visualization error: ${error.message}</span>
+      `;
+      container.appendChild(errorMessage);
+      perfMonitor.end('visualizePacking');
+    }
+  }
     // Check for dark mode
     const isDarkMode = document.documentElement.getAttribute('data-theme') === 'dark';
     
@@ -1008,7 +1170,7 @@ function displayGeometry(geometry, scene, camera, controls) {
     };
     
     perfMonitor.end('visualizePacking');
-  }
+  
   
   // Create enhanced printer outline
   function createEnhancedPrinterOutline(scene, printer, isDarkMode) {
@@ -1177,8 +1339,7 @@ function displayGeometry(geometry, scene, camera, controls) {
   }
   
   // Apply orientation to mesh (resets from original geometry)
-  function applyOrientation(mesh, originalSize, orientationType) {
-    console.log(`Applying orientation: ${orientationType}`);
+function applyOrientation(mesh, originalSize, orientationType) {
     // Reset
     mesh.rotation.set(0, 0, 0);
     mesh.updateMatrix();
@@ -1190,7 +1351,7 @@ function displayGeometry(geometry, scene, camera, controls) {
       : mesh.geometry;
     const newGeometry = baseGeometry.clone();
     
-    // Determine which axis is longest, middle, shortest
+    // Determine dimensions
     const origWidth = originalSize.x;
     const origDepth = originalSize.y;
     const origHeight = originalSize.z;
@@ -1199,36 +1360,36 @@ function displayGeometry(geometry, scene, camera, controls) {
       { value: origDepth, axis: 'y' },
       { value: origHeight, axis: 'z' }
     ];
-    origDimensions.sort((a, b) => b.value - a.value); // Sort descending (longest to shortest)
+    origDimensions.sort((a, b) => b.value - a.value); // Sort descending
     
     const maxDimAxis = origDimensions[0].axis; // Longest dimension
-    const midDimAxis = origDimensions[1].axis; // Middle dimension
     const minDimAxis = origDimensions[2].axis; // Shortest dimension
     
     let rotationMatrix = new THREE.Matrix4();
     
     if (orientationType === "vertical") {
-      // Put the longest dimension on Z (upright, standing vertically)
-      console.log(`Longest dimension on ${maxDimAxis}, rotating to Z`);
-      if (maxDimAxis === 'x') {
-        rotationMatrix.makeRotationY(-Math.PI / 2); // Rotate X to Z
-      } else if (maxDimAxis === 'y') {
-        rotationMatrix.makeRotationX(Math.PI / 2); // Rotate Y to Z
-      } else if (maxDimAxis === 'z') {
-        // Already aligned with Z, no rotation needed
-      }
-    } else if (orientationType === "flat") {
-      // Put the shortest dimension on Z (lying flat, lowest height)
-      console.log(`Shortest dimension on ${minDimAxis}, rotating to Z`);
-      if (minDimAxis === 'x') {
-        rotationMatrix.makeRotationY(-Math.PI / 2); // Rotate X to Z
-      } else if (minDimAxis === 'y') {
-        rotationMatrix.makeRotationX(Math.PI / 2); // Rotate Y to Z
-      } else if (minDimAxis === 'z') {
-        // Already aligned with Z, no rotation needed
-      }
+        // Need to put longest dimension on Z-axis
+        if (maxDimAxis === 'x') {
+            // Rotate 90 degrees around Y to put X on Z
+            rotationMatrix.makeRotationY(Math.PI / 2);
+        } else if (maxDimAxis === 'y') {
+            // Rotate -90 degrees around X to put Y on Z
+            rotationMatrix.makeRotationX(-Math.PI / 2);
+        }
+        // If maxDimAxis is already Z, no rotation needed
+    } else { // "flat" orientation
+        // Need to put shortest dimension on Z-axis
+        if (minDimAxis === 'x') {
+            // Rotate 90 degrees around Y to put X on Z
+            rotationMatrix.makeRotationY(Math.PI / 2);
+        } else if (minDimAxis === 'y') {
+            // Rotate -90 degrees around X to put Y on Z
+            rotationMatrix.makeRotationX(-Math.PI / 2);
+        }
+        // If minDimAxis is already Z, no rotation needed
     }
     
+    // Apply rotation
     newGeometry.applyMatrix4(rotationMatrix);
     
     // Update mesh
@@ -1245,7 +1406,7 @@ function displayGeometry(geometry, scene, camera, controls) {
     mesh.position.set(-center.x, -center.y, -bbox.min.z);
     
     return newGeometry;
-  }
+}
   
   // Load STL for packing
   async function loadSTLModelForPacking(stlData) {
