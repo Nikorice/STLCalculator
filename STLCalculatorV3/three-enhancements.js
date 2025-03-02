@@ -1,7 +1,4 @@
-/* powder-calc-part3.js - Three.js Visualization Functions */
-
-/* ====================== THREE.JS FUNCTIONS ====================== */
-/* Performance Optimizations */
+/* Enhanced Three.js Viewer */
 
 // Enhanced version of initThreeJSViewer
 function initThreeJSViewer(container) {
@@ -307,12 +304,14 @@ function initThreeJSViewer(container) {
     }
   }
   
-// Enhanced version of displayGeometry that makes the STL object sit on a flat grid
-function displayGeometry(geometry, scene, camera, controls) {
+  // Enhanced version of displayGeometry
+  function displayGeometry(geometry, scene, camera, controls) {
     perfMonitor.start('displayModel');
-  
-    // Clone original geometry and clear existing meshes from the scene
+    
+    // Clone original
     const originalGeometry = geometry.clone();
+    
+    // Clear existing
     scene.traverse(obj => {
       if (obj.isMesh) {
         if (obj.geometry) obj.geometry.dispose();
@@ -326,9 +325,10 @@ function displayGeometry(geometry, scene, camera, controls) {
         scene.remove(obj);
       }
     });
-  
-    // Create an enhanced material
+    
+    // Create enhanced material with better visual appearance
     const isDarkMode = document.documentElement.getAttribute('data-theme') === 'dark';
+    
     const material = new THREE.MeshPhysicalMaterial({
       color: isDarkMode ? 0x3b82f6 : 0x3a86ff,
       metalness: 0.1,
@@ -338,45 +338,37 @@ function displayGeometry(geometry, scene, camera, controls) {
       clearcoatRoughness: 0.3,
       flatShading: true
     });
-  
-    // Create the mesh
+    
     const mesh = new THREE.Mesh(geometry, material);
-  
-    // Compute the original bounding box and size for orientation data
+    
+    // Original size
     originalGeometry.computeBoundingBox();
     const originalSize = new THREE.Vector3();
     originalGeometry.boundingBox.getSize(originalSize);
-  
-    // Store original data for future resets
+    
+    // Store so we can reset orientation
     mesh.userData.originalGeometry = originalGeometry;
     mesh.userData.originalSize = originalSize.clone();
-  
-    // Determine optimal orientation (for example, flat or vertical)
+    
+    // Determine orientation data
     const orientationData = determineOptimalOrientation(
       originalSize.x, originalSize.y, originalSize.z
     );
-  
-    // Apply default "flat" orientation
+    
+    // Default to "flat"
     applyOrientation(mesh, originalSize, "flat");
-  
-    // Now adjust the mesh so its lowest point is at y = 0.
-    // Compute the bounding box after orientation and shift it upward.
-    mesh.geometry.computeBoundingBox();
-    const bbox = mesh.geometry.boundingBox;
-    const yOffset = bbox.min.y; // distance below y=0
-    mesh.position.y -= yOffset;
-  
-    // Add the mesh to the scene
+    
     scene.add(mesh);
-  
-    // Adjust camera position and target based on the new bounding box
+    
+    // Adjust camera with smooth animation
     mesh.geometry.computeBoundingBox();
     const newBbox = mesh.geometry.boundingBox;
     const size = new THREE.Vector3();
     newBbox.getSize(size);
     const maxDim = Math.max(size.x, size.y, size.z);
     const distance = Math.max(maxDim * 1.5, 50);
-  
+    
+    // Use GSAP for smooth camera animation
     if (typeof gsap !== 'undefined') {
       gsap.to(camera.position, {
         x: distance,
@@ -385,6 +377,7 @@ function displayGeometry(geometry, scene, camera, controls) {
         duration: 1.2,
         ease: "power2.inOut"
       });
+      
       gsap.to(controls.target, {
         x: 0,
         y: 0,
@@ -396,35 +389,28 @@ function displayGeometry(geometry, scene, camera, controls) {
         }
       });
     } else {
+      // Fallback if GSAP isn't available
       camera.position.set(distance, distance, distance);
       controls.target.set(0, 0, size.z / 2);
       camera.lookAt(0, 0, size.z / 2);
       controls.update();
     }
-  
-    // Add enhanced axis helpers (remains unchanged)
+    
     addEnhancedAxisHelpers(scene, Math.max(maxDim, 20));
-  
-    // Add a flat grid helper on the XZ plane.
-    const gridSize = Math.max(maxDim * 2, 50);
-    const gridDivisions = 20;
-    const gridHelper = new THREE.GridHelper(gridSize, gridDivisions, 0x3a86ff, 0xd1d5db);
-    gridHelper.position.y = 0;  // Place grid at y = 0 (the floor)
-    gridHelper.rotation.x = 0;  // Ensure grid is not rotated (remains on XZ)
-    scene.add(gridHelper);
-  
-    // Save data in scene.userData for later use if needed
+    
+    // Add a grid for better spatial reference
+    addGrid(scene, Math.max(maxDim * 2, 50));
+    
     scene.userData = {
       originalGeometry,
       originalSize,
       mesh,
       orientationData
     };
-  
+    
     perfMonitor.end('displayModel');
     return orientationData;
   }
-  
   
   // Enhanced axis helpers
   function addEnhancedAxisHelpers(scene, size) {
@@ -1111,155 +1097,3 @@ function displayGeometry(geometry, scene, camera, controls) {
     const heightLine = new THREE.Line(heightGeometry, dimLineMaterial);
     scene.add(heightLine);
   }
-  
-  // Determine the optimal orientation for an object (longest dimension = vertical or default to flat, etc.)
-  function determineOptimalOrientation(width, depth, height) {
-    const dimensions = [
-      { value: width, name: 'width' },
-      { value: depth, name: 'depth' },
-      { value: height, name: 'height' }
-    ];
-    dimensions.sort((a, b) => b.value - a.value); // descending
-    
-    const maxDim = dimensions[0];
-    const midDim = dimensions[1];
-    const minDim = dimensions[2];
-    
-    let orientation = {
-      width: 0,
-      depth: 0,
-      height: 0,
-      type: "",
-      printTime: 0,
-      vertical: {
-        width: 0,
-        depth: 0, 
-        height: 0,
-        printTime: 0
-      },
-      flat: {
-        width: 0,
-        depth: 0,
-        height: 0,
-        printTime: 0
-      }
-    };
-    
-    // vertical: put the longest dimension on Z
-    if (maxDim.value <= printer600.height) {
-      orientation.vertical.width = minDim.value;
-      orientation.vertical.depth = midDim.value;
-      orientation.vertical.height = maxDim.value;
-      orientation.vertical.printTime = Math.ceil(maxDim.value / 0.1) * printer600.layerTime;
-    } else {
-      // too tall; scale it or just set to max
-      const scale = printer600.height / maxDim.value;
-      orientation.vertical.width = minDim.value * scale;
-      orientation.vertical.depth = midDim.value * scale;
-      orientation.vertical.height = printer600.height;
-      orientation.vertical.printTime = Math.ceil(printer600.height / 0.1) * printer600.layerTime;
-    }
-    
-    // flat: put the shortest dimension on Z
-    orientation.flat.width = maxDim.value;
-    orientation.flat.depth = midDim.value;
-    orientation.flat.height = minDim.value;
-    orientation.flat.printTime = Math.ceil(minDim.value / 0.1) * printer600.layerTime;
-    
-    // default to flat
-    orientation.width = orientation.flat.width;
-    orientation.depth = orientation.flat.depth;
-    orientation.height = orientation.flat.height;
-    orientation.printTime = orientation.flat.printTime;
-    orientation.type = "flat";
-    
-    return orientation;
-  }
-  
-  // Apply orientation to mesh (resets from original geometry)
-  function applyOrientation(mesh, originalSize, orientationType) {
-    console.log(`Applying orientation: ${orientationType}`);
-    // Reset
-    mesh.rotation.set(0, 0, 0);
-    mesh.updateMatrix();
-    mesh.matrix.identity();
-    
-    // Use unmodified geometry
-    const baseGeometry = mesh.userData.originalGeometry
-      ? mesh.userData.originalGeometry
-      : mesh.geometry;
-    const newGeometry = baseGeometry.clone();
-    
-    // Determine which axis is longest, middle, shortest
-    const origWidth = originalSize.x;
-    const origDepth = originalSize.y;
-    const origHeight = originalSize.z;
-    const origDimensions = [
-      { value: origWidth, axis: 'x' },
-      { value: origDepth, axis: 'y' },
-      { value: origHeight, axis: 'z' }
-    ];
-    origDimensions.sort((a, b) => b.value - a.value); // Sort descending (longest to shortest)
-    
-    const maxDimAxis = origDimensions[0].axis; // Longest dimension
-    const midDimAxis = origDimensions[1].axis; // Middle dimension
-    const minDimAxis = origDimensions[2].axis; // Shortest dimension
-    
-    let rotationMatrix = new THREE.Matrix4();
-    
-    if (orientationType === "vertical") {
-      // Put the longest dimension on Z (upright, standing vertically)
-      console.log(`Longest dimension on ${maxDimAxis}, rotating to Z`);
-      if (maxDimAxis === 'x') {
-        rotationMatrix.makeRotationY(-Math.PI / 2); // Rotate X to Z
-      } else if (maxDimAxis === 'y') {
-        rotationMatrix.makeRotationX(Math.PI / 2); // Rotate Y to Z
-      } else if (maxDimAxis === 'z') {
-        // Already aligned with Z, no rotation needed
-      }
-    } else if (orientationType === "flat") {
-      // Put the shortest dimension on Z (lying flat, lowest height)
-      console.log(`Shortest dimension on ${minDimAxis}, rotating to Z`);
-      if (minDimAxis === 'x') {
-        rotationMatrix.makeRotationY(-Math.PI / 2); // Rotate X to Z
-      } else if (minDimAxis === 'y') {
-        rotationMatrix.makeRotationX(Math.PI / 2); // Rotate Y to Z
-      } else if (minDimAxis === 'z') {
-        // Already aligned with Z, no rotation needed
-      }
-    }
-    
-    newGeometry.applyMatrix4(rotationMatrix);
-    
-    // Update mesh
-    mesh.geometry.dispose();
-    mesh.geometry = newGeometry;
-    
-    // Re-center and position so bottom is at Z=0
-    newGeometry.computeBoundingBox();
-    const bbox = newGeometry.boundingBox;
-    const center = new THREE.Vector3();
-    bbox.getCenter(center);
-    
-    // Position so bottom is at Z=0
-    mesh.position.set(-center.x, -center.y, -bbox.min.z);
-    
-    return newGeometry;
-  }
-  
-  // Load STL for packing
-  async function loadSTLModelForPacking(stlData) {
-    return new Promise((resolve, reject) => {
-      try {
-        const loader = new THREE.STLLoader();
-        const geometry = loader.parse(stlData);
-        resolve(geometry);
-      } catch (error) {
-        console.error("Error loading STL for packing:", error);
-        reject(error);
-      }
-    });
-  }
-  
-  // Implementing a cache for visualizations
-  const packingVisCache = new Map();

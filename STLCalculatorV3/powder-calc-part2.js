@@ -1,6 +1,6 @@
 /* powder-calc-part2.js */
+/* powder-calc-part2.js */
 /* ====================== PERFORMANCE MONITORING ====================== */
-// Simple performance monitoring
 const perfMonitor = {
     start: function(label) {
       this.timers = this.timers || {};
@@ -18,32 +18,29 @@ const perfMonitor = {
   };
   
   /* ====================== CONSTANTS & SETTINGS ====================== */
-  // Default spacing settings
-  let WALL_MARGIN = 10; // 1 cm from printer walls (only sides)
-  let OBJECT_SPACING = 15; // 1.5 cm between objects (X, Y, Z)
+  let WALL_MARGIN = 10; 
+  let OBJECT_SPACING = 15; 
   
-  /* Material usage constants */
-  const POWDER_KG_PER_CM3 = 0.002;  // 2g/1000 = 0.002 kg per cm³
-  const BINDER_ML_PER_CM3 = 0.27;   // 270ml/1000 = 0.27 ml per cm³
-  const SILICA_G_PER_CM3 = 0.55;    // 0.5*1.1 = 0.55 g per cm³
+  const POWDER_KG_PER_CM3 = 0.002; 
+  const BINDER_ML_PER_CM3 = 0.27;  
+  const SILICA_G_PER_CM3 = 0.55;   
   
-  // Show memory warning based on device
   if (navigator.deviceMemory && navigator.deviceMemory < 8) {
-    document.querySelector('.memory-warning').style.display = 'block';
+    const memWarn = document.querySelector('.memory-warning');
+    if (memWarn) memWarn.style.display = 'block';
   }
   
-  // Function to calculate glaze usage
   function calculateGlazeUsage(volumeCm3) {
-    return 0.1615 * volumeCm3 + 31.76; // g
+    return 0.1615 * volumeCm3 + 31.76; // grams
   }
   
-  /* Printer specifications */
+  /* Printer specs */
   const printer400 = {
     name: "Printer 400",
     width: 390,
     depth: 290,
     height: 200,
-    layerTime: 45 // seconds per 0.1mm layer
+    layerTime: 45
   };
   
   const printer600 = {
@@ -51,7 +48,7 @@ const perfMonitor = {
     width: 595,
     depth: 600,
     height: 250,
-    layerTime: 35 // seconds per 0.1mm layer
+    layerTime: 35
   };
   
   /* Default pricing data */
@@ -62,8 +59,15 @@ const perfMonitor = {
     SGD: { powder: 135, binder: 0.12, silica: 0.10, glaze: 0.01365 }
   };
   
-  /* ====================== STL PARSING ====================== */
-  // Parse binary STL file - generator function for chunked processing
+  /* ====================== STL PARSING & VOLUME ====================== */
+  // Async chunked parsing (for large STL)
+  async function parseBinarySTLAsync(arrayBuffer) {
+    // ... [Implementation from your existing code, chunking if needed]
+  }
+  async function computeVolumeCm3Async(triangles) {
+    // ... [Implementation from your existing code, chunking if needed]
+  }
+  
   function* parseBinarySTLGenerator(arrayBuffer) {
     // Handle very large files by using a more memory-efficient approach
     const data = new DataView(arrayBuffer);
