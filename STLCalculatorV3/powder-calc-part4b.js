@@ -356,16 +356,37 @@ function updateAllResults() {
 
 // Advanced settings display
 function updateAdvancedSettingsDisplay() {
+  console.log("Updating advanced settings display...");
   const currency = document.getElementById("currency").value;
   const p = pricing[currency];
   
-  document.getElementById("pricePowder").value = p.powder.toFixed(2);
-  document.getElementById("priceBinder").value = p.binder.toFixed(2);
-  document.getElementById("priceSilica").value = p.silica.toFixed(2);
-  document.getElementById("priceGlaze").value = p.glaze.toFixed(2);
+  // Make sure pricing data exists for the selected currency
+  if (!p) {
+    console.error(`No pricing data found for currency: ${currency}`);
+    return;
+  }
   
+  // Update input fields with current pricing values
+  const pricePowderInput = document.getElementById("pricePowder");
+  const priceBinderInput = document.getElementById("priceBinder");
+  const priceSilicaInput = document.getElementById("priceSilica");
+  const priceGlazeInput = document.getElementById("priceGlaze");
+  
+  if (pricePowderInput) pricePowderInput.value = p.powder.toFixed(3);
+  if (priceBinderInput) priceBinderInput.value = p.binder.toFixed(3);
+  if (priceSilicaInput) priceSilicaInput.value = p.silica.toFixed(3);
+  if (priceGlazeInput) priceGlazeInput.value = p.glaze.toFixed(5);
+  
+  // Update currency labels
   document.querySelectorAll(".input-group-append").forEach(elem => {
     elem.textContent = currency;
+  });
+  
+  console.log("Advanced settings updated with values:", {
+    powder: p.powder,
+    binder: p.binder,
+    silica: p.silica,
+    glaze: p.glaze
   });
 }
 
