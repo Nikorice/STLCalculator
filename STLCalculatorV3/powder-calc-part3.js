@@ -1,25 +1,36 @@
 /* powder-calc-part3.js - Three.js Visualization Functions */
 
 /* ====================== THREE.JS FUNCTIONS ====================== */
+/* Performance Optimizations */
+
+// 1. Optimize Three.js rendering with throttling and lazy initialization
+// Add this to powder-calc-part3.js or replace the existing function
+
 function initThreeJSViewer(container) {
     perfMonitor.start('initViewer');
     
-    // Create renderer with optimized settings for performance
-    const renderer = new THREE.WebGLRenderer({ 
-      antialias: window.devicePixelRatio < 2,
+    // Only create the Three.js context when actually needed (lazy initialization)
+    let renderer, scene, camera, controls;
+    let animationFrameId;
+    let active = false;
+    let needsRender = false;
+    
+    // Create renderer with optimized settings
+    renderer = new THREE.WebGLRenderer({ 
+      antialias: false, // Disable antialiasing for performance
       powerPreference: 'high-performance',
       precision: 'mediump'
     });
     renderer.setSize(container.clientWidth, container.clientHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5)); // Limit pixel ratio
     renderer.setClearColor(0xf0f2f5);
     container.appendChild(renderer.domElement);
     
-    // Create scene with minimal defaults
-    const scene = new THREE.Scene();
+    // Create scene
+    scene = new THREE.Scene();
     
     // Create camera
-    const camera = new THREE.PerspectiveCamera(
+    camera = new THREE.PerspectiveCamera(
       45,
       container.clientWidth / container.clientHeight,
       0.1,
@@ -27,54 +38,78 @@ function initThreeJSViewer(container) {
     );
     camera.position.set(50, 50, 50);
     
-    // Add minimal lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    // Simplified lighting - fewer lights = better performance
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
     scene.add(ambientLight);
     
     const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
     dirLight.position.set(50, 50, 50);
     scene.add(dirLight);
     
-    // Add orbit controls
-    const controls = new THREE.OrbitControls(camera, renderer.domElement);
+    // Add orbit controls with reduced smoothness for better performance
+    controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
-    controls.dampingFactor = 0.2;
+    controls.dampingFactor = 0.15;
     controls.screenSpacePanning = false;
     controls.maxPolarAngle = Math.PI;
     controls.enableZoom = true;
-    controls.zoomSpeed = 1.0;
-    controls.rotateSpeed = 0.7;
+    controls.zoomSpeed = 0.8;
+    controls.rotateSpeed = 0.6;
     
-    // Handle window resize (debounced)
+    // Throttled resize handler
     let resizeTimeout;
-    function onWindowResize() {
+    const onWindowResize = () => {
       if (resizeTimeout) clearTimeout(resizeTimeout);
       resizeTimeout = setTimeout(() => {
         camera.aspect = container.clientWidth / container.clientHeight;
         camera.updateProjectionMatrix();
         renderer.setSize(container.clientWidth, container.clientHeight);
-      }, 100);
-    }
+        needsRender = true;
+      }, 200); // More throttling
+    };
+    
     const resizeObserver = new ResizeObserver(onWindowResize);
     resizeObserver.observe(container);
     
-    // Animation loop (throttled ~30fps)
-    let animationFrameId;
-    let lastTime = 0;
+    // Animation loop with frame limiting
+    let lastRenderTime = 0;
+    const FRAME_INTERVAL = 33; // Limit to 30fps (33ms)
+    
     function animate(time) {
       animationFrameId = requestAnimationFrame(animate);
-      if (time - lastTime >= 33) {
+      
+      // Only render when visible in viewport
+      if (!active) return;
+      
+      // Check if enough time has passed since last render or if a render is needed
+      if (time - lastRenderTime >= FRAME_INTERVAL || needsRender) {
         controls.update();
         renderer.render(scene, camera);
-        lastTime = time;
+        lastRenderTime = time;
+        needsRender = false;
       }
     }
+    
+    // Use Intersection Observer to only animate when in viewport
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        active = entry.isIntersecting;
+        if (active) {
+          needsRender = true;
+        }
+      });
+    }, { threshold: 0.1 });
+    
+    observer.observe(container);
+    
+    // Start animation
     animate(0);
     
     // Cleanup
     const cleanup = () => {
-      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+      observer.disconnect();
       if (resizeObserver) resizeObserver.disconnect();
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
       
       scene.traverse(object => {
         if (object.geometry) object.geometry.dispose();
@@ -90,6 +125,7 @@ function initThreeJSViewer(container) {
       if (renderer.domElement && renderer.domElement.parentNode) {
         renderer.domElement.parentNode.removeChild(renderer.domElement);
       }
+      
       renderer.dispose();
     };
     
@@ -689,3 +725,7 @@ function createPrinterOutline(scene, printer) {
     scene.add(line);
   });
 }
+
+// Implementing a cache for visualizations
+const packingVisCache = new Map();
+

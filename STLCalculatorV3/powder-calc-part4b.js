@@ -24,7 +24,6 @@ async function updateResults(rowId) {
     const depth = parseFloat(resultsPanel.dataset.depth);
     const height = parseFloat(resultsPanel.dataset.height);
     const orientation = resultsPanel.dataset.orientation || "flat";
-    const objectPrintTime = parseFloat(resultsPanel.dataset.printTime || 0);
     
     // Get current currency
     const currency = document.getElementById("currency").value;
@@ -58,54 +57,34 @@ async function updateResults(rowId) {
     // Total cost
     const totalCost = costPowder + costBinder + costSilica + costGlaze;
     
-    // Update total cost display
-    const totalCostElement = resultsPanel.querySelector(".total-cost");
-    if (totalCostElement) {
-      totalCostElement.textContent = `${currencySymbol}${totalCost.toFixed(2)}`;
-    }
+    // Batch DOM updates for better performance
+    // Create a document fragment for updates
+    const updates = {};
     
-    // Update stats
-    const statBoxes = resultsPanel.querySelectorAll(".stat-box");
-    if (statBoxes.length >= 2) {
-      const volumeValue = statBoxes[0].querySelector(".stat-value");
-      if (volumeValue) {
-        volumeValue.textContent = volumeCm3.toFixed(2);
-      }
-      const dimensionsValue = statBoxes[1].querySelector(".stat-value");
-      if (dimensionsValue) {
-        dimensionsValue.textContent = `${width.toFixed(1)} × ${depth.toFixed(1)} × ${height.toFixed(1)}`;
-      }
-    }
+    // Prepare total cost update
+    updates.totalCost = `${currencySymbol}${totalCost.toFixed(2)}`;
     
-    // Update progress bars
-    const progressContainer = resultsPanel.querySelector(".progress-container");
-    if (progressContainer) {
-      const data = [
-        { name: "Powder", cost: costPowder, color: "#3a86ff" },
-        { name: "Binder", cost: costBinder, color: "#ff006e" },
-        { name: "Silica", cost: costSilica, color: "#8338ec" },
-        { name: "Glaze", cost: costGlaze, color: "#ffbe0b" }
-      ];
-      createProgressBars(progressContainer, data, totalCost, currency);
-    }
+    // Prepare stats updates
+    updates.volume = volumeCm3.toFixed(2);
+    updates.dimensions = `${width.toFixed(1)} × ${depth.toFixed(1)} × ${height.toFixed(1)}`;
     
-    // Prepare STL geometry for packing
-    let stlGeometry = null;
-    if (row.stlArrayBuffer) {
-      try {
-        const stlLoader = new THREE.STLLoader();
-        stlGeometry = stlLoader.parse(row.stlArrayBuffer);
-      } catch (err) {
-        console.warn("Could not load STL for packing visualization:", err);
-      }
-    }
+    // Prepare progress bar data
+    updates.progressData = [
+      { name: "Powder", cost: costPowder, color: "#3a86ff" },
+      { name: "Binder", cost: costBinder, color: "#ff006e" },
+      { name: "Silica", cost: costSilica, color: "#8338ec" },
+      { name: "Glaze", cost: costGlaze, color: "#ffbe0b" }
+    ];
     
-    // Calculate printer packing
-    if (!isNaN(width) && !isNaN(depth) && !isNaN(height)) {
+    // Calculate printer packing in parallel with the UI updates
+    const packingPromise = (async () => {
+      if (isNaN(width) || isNaN(depth) || isNaN(height)) return null;
+      
       try {
         // Printer 400
         const packing400 = calculateOptiPacking(width, depth, height, printer400);
-        const packPositions400 = generatePackingPositions(width, depth, height, printer400);
+        const packPositions400 = packing400.fitsInPrinter ? 
+          generatePackingPositions(width, depth, height, printer400) : [];
         const cost400 = packing400.totalObjects * totalCost;
         
         let printTime400 = "N/A";
@@ -116,7 +95,8 @@ async function updateResults(rowId) {
         
         // Printer 600
         const packing600 = calculateOptiPacking(width, depth, height, printer600);
-        const packPositions600 = generatePackingPositions(width, depth, height, printer600);
+        const packPositions600 = packing600.fitsInPrinter ? 
+          generatePackingPositions(width, depth, height, printer600) : [];
         const cost600 = packing600.totalObjects * totalCost;
         
         let printTime600 = "N/A";
@@ -125,15 +105,78 @@ async function updateResults(rowId) {
           printTime600 = totalLayers600 * printer600.layerTime;
         }
         
+        return {
+          printer400: {
+            packing: packing400,
+            positions: packPositions400,
+            cost: cost400,
+            printTime: printTime400
+          },
+          printer600: {
+            packing: packing600,
+            positions: packPositions600,
+            cost: cost600,
+            printTime: printTime600
+          }
+        };
+      } catch (err) {
+        console.error("Error in packing calculation:", err);
+        return null;
+      }
+    })();
+    
+    // Apply all DOM updates at once - this reduces layout thrashing
+    requestAnimationFrame(() => {
+      // Update total cost
+      const totalCostElement = resultsPanel.querySelector(".total-cost");
+      if (totalCostElement) {
+        totalCostElement.textContent = updates.totalCost;
+      }
+      
+      // Update stats
+      const statBoxes = resultsPanel.querySelectorAll(".stat-box");
+      if (statBoxes.length >= 2) {
+        const volumeValue = statBoxes[0].querySelector(".stat-value");
+        if (volumeValue) {
+          volumeValue.textContent = updates.volume;
+        }
+        const dimensionsValue = statBoxes[1].querySelector(".stat-value");
+        if (dimensionsValue) {
+          dimensionsValue.textContent = updates.dimensions;
+        }
+      }
+      
+      // Update progress bars
+      const progressContainer = resultsPanel.querySelector(".progress-container");
+      if (progressContainer) {
+        createProgressBars(progressContainer, updates.progressData, totalCost, currency);
+      }
+    });
+    
+    // Now handle the packing results after they've been calculated
+    const packingResults = await packingPromise;
+    if (packingResults) {
+      requestAnimationFrame(() => {
+        // Prepare STL geometry for packing
+        let stlGeometry = null;
+        if (row.stlArrayBuffer) {
+          try {
+            const stlLoader = new THREE.STLLoader();
+            stlGeometry = stlLoader.parse(row.stlArrayBuffer);
+          } catch (err) {
+            console.warn("Could not load STL for packing visualization:", err);
+          }
+        }
+        
         // Update printer stats
         const printer400Stats = document.getElementById(`${rowId}-printer-400-stats`);
         if (printer400Stats) {
-          if (packing400.fitsInPrinter) {
+          if (packingResults.printer400.packing.fitsInPrinter) {
             printer400Stats.innerHTML = `
-              <p><span class="printer-highlight">${packing400.totalObjects}</span> objects</p>
-              <p>Arrangement: ${packing400.arrangement}</p>
-              <p>Print Time: ${formatPrintTime(printTime400)}</p>
-              <p>Total Cost: ${currencySymbol}${cost400.toFixed(2)}</p>
+              <p><span class="printer-highlight">${packingResults.printer400.packing.totalObjects}</span> objects</p>
+              <p>Arrangement: ${packingResults.printer400.packing.arrangement}</p>
+              <p>Print Time: ${formatPrintTime(packingResults.printer400.printTime)}</p>
+              <p>Total Cost: ${currencySymbol}${packingResults.printer400.cost.toFixed(2)}</p>
             `;
           } else {
             printer400Stats.innerHTML = `
@@ -145,12 +188,12 @@ async function updateResults(rowId) {
         
         const printer600Stats = document.getElementById(`${rowId}-printer-600-stats`);
         if (printer600Stats) {
-          if (packing600.fitsInPrinter) {
+          if (packingResults.printer600.packing.fitsInPrinter) {
             printer600Stats.innerHTML = `
-              <p><span class="printer-highlight">${packing600.totalObjects}</span> objects</p>
-              <p>Arrangement: ${packing600.arrangement}</p>
-              <p>Print Time: ${formatPrintTime(printTime600)}</p>
-              <p>Total Cost: ${currencySymbol}${cost600.toFixed(2)}</p>
+              <p><span class="printer-highlight">${packingResults.printer600.packing.totalObjects}</span> objects</p>
+              <p>Arrangement: ${packingResults.printer600.packing.arrangement}</p>
+              <p>Print Time: ${formatPrintTime(packingResults.printer600.printTime)}</p>
+              <p>Total Cost: ${currencySymbol}${packingResults.printer600.cost.toFixed(2)}</p>
             `;
           } else {
             printer600Stats.innerHTML = `
@@ -160,41 +203,42 @@ async function updateResults(rowId) {
           }
         }
         
-        // Visualize packing (updated to pass orientation)
-        const packing400Vis = document.getElementById(`${rowId}-packing-400`);
-        if (packing400Vis) {
-          visualizePacking(
-            printer400,
-            width,
-            depth,
-            height,
-            packPositions400,
-            packing400Vis,
-            stlGeometry,
-            orientation // <--- pass orientation here
-          );
-        }
-        
-        const packing600Vis = document.getElementById(`${rowId}-packing-600`);
-        if (packing600Vis) {
-          visualizePacking(
-            printer600,
-            width,
-            depth,
-            height,
-            packPositions600,
-            packing600Vis,
-            stlGeometry,
-            orientation // <--- pass orientation here
-          );
-        }
-      } catch (err) {
-        console.error("Error in packing calculation:", err);
-      }
+        // Visualize packing on next animation frame to avoid blocking the UI
+        setTimeout(() => {
+          // Visualize packing (updated to pass orientation)
+          const packing400Vis = document.getElementById(`${rowId}-packing-400`);
+          if (packing400Vis) {
+            visualizePacking(
+              printer400,
+              width,
+              depth,
+              height,
+              packingResults.printer400.positions,
+              packing400Vis,
+              stlGeometry,
+              orientation
+            );
+          }
+          
+          const packing600Vis = document.getElementById(`${rowId}-packing-600`);
+          if (packing600Vis) {
+            visualizePacking(
+              printer600,
+              width,
+              depth,
+              height,
+              packingResults.printer600.positions,
+              packing600Vis,
+              stlGeometry,
+              orientation
+            );
+          }
+        }, 0);
+      });
     }
     
     perfMonitor.end('updateResults');
-}
+  }
 
 // Calculate manual input results
 function calculateManualResults() {
@@ -356,40 +400,41 @@ function updateAllResults() {
 
 // Advanced settings display
 function updateAdvancedSettingsDisplay() {
-  console.log("Updating advanced settings display...");
-  const currency = document.getElementById("currency").value;
-  const p = pricing[currency];
-  
-  // Make sure pricing data exists for the selected currency
-  if (!p) {
-    console.error(`No pricing data found for currency: ${currency}`);
-    return;
+    console.log("Updating advanced settings display...");
+    const currency = document.getElementById("currency").value;
+    const p = pricing[currency];
+    
+    // Make sure pricing data exists for the selected currency
+    if (!p) {
+      console.error(`No pricing data found for currency: ${currency}`);
+      return;
+    }
+    
+    // Update input fields with current pricing values
+    const pricePowderInput = document.getElementById("pricePowder");
+    const priceBinderInput = document.getElementById("priceBinder");
+    const priceSilicaInput = document.getElementById("priceSilica");
+    const priceGlazeInput = document.getElementById("priceGlaze");
+    
+    // Limit to 2 decimal places for all price inputs
+    if (pricePowderInput) pricePowderInput.value = p.powder.toFixed(2);
+    if (priceBinderInput) priceBinderInput.value = p.binder.toFixed(2);
+    if (priceSilicaInput) priceSilicaInput.value = p.silica.toFixed(2);
+    if (priceGlazeInput) priceGlazeInput.value = p.glaze.toFixed(2);
+    
+    // Update currency labels
+    document.querySelectorAll(".input-group-append").forEach(elem => {
+      elem.textContent = currency;
+    });
+    
+    console.log("Advanced settings updated with values:", {
+      powder: p.powder.toFixed(2),
+      binder: p.binder.toFixed(2),
+      silica: p.silica.toFixed(2),
+      glaze: p.glaze.toFixed(2)
+    });
   }
   
-  // Update input fields with current pricing values
-  const pricePowderInput = document.getElementById("pricePowder");
-  const priceBinderInput = document.getElementById("priceBinder");
-  const priceSilicaInput = document.getElementById("priceSilica");
-  const priceGlazeInput = document.getElementById("priceGlaze");
-  
-  if (pricePowderInput) pricePowderInput.value = p.powder.toFixed(3);
-  if (priceBinderInput) priceBinderInput.value = p.binder.toFixed(3);
-  if (priceSilicaInput) priceSilicaInput.value = p.silica.toFixed(3);
-  if (priceGlazeInput) priceGlazeInput.value = p.glaze.toFixed(5);
-  
-  // Update currency labels
-  document.querySelectorAll(".input-group-append").forEach(elem => {
-    elem.textContent = currency;
-  });
-  
-  console.log("Advanced settings updated with values:", {
-    powder: p.powder,
-    binder: p.binder,
-    silica: p.silica,
-    glaze: p.glaze
-  });
-}
-
 // Format print time
 function formatPrintTime(sec) {
   if (sec === "N/A") return "N/A";

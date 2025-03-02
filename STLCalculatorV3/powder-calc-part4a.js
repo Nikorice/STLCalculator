@@ -338,111 +338,146 @@ function createUniqueId() {
     
     // Process STL file with optimized async loading
     async function processSTLFileAsync(rowId, file, uploadArea, modelViewer, resultsPanel, scene, camera, controls, packing400Vis, packing600Vis) {
-      perfMonitor.start('processSTL');
-      
-      // Get elements
-      const row = document.getElementById(rowId);
-      const loadingMessage = resultsPanel.querySelector(".loading-message");
-      const errorMessage = resultsPanel.querySelector(".error-message");
-      const modelViewerLoading = modelViewer.querySelector('.model-viewer-loading');
-      const orientationToggle = row.querySelector('.orientation-toggle');
-      
-      // Show loading message, hide error message
-      loadingMessage.style.display = "flex";
-      errorMessage.style.display = "none";
-      modelViewerLoading.style.display = "flex";
-      orientationToggle.style.display = "none"; // Hide orientation toggle until loaded
-      
-      // Use Promise-based FileReader
-      try {
-        // Read the file as ArrayBuffer
-        const arrayBuffer = await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = (event) => resolve(event.target.result);
-          reader.onerror = (error) => reject(error);
-          reader.readAsArrayBuffer(file);
-        });
+        perfMonitor.start('processSTL');
         
-        // Store the array buffer for packing visualization
-        row.stlArrayBuffer = arrayBuffer;
+        // Get elements
+        const row = document.getElementById(rowId);
+        const loadingMessage = resultsPanel.querySelector(".loading-message");
+        const errorMessage = resultsPanel.querySelector(".error-message");
+        const modelViewerLoading = modelViewer.querySelector('.model-viewer-loading');
+        const orientationToggle = row.querySelector('.orientation-toggle');
+        
+        // Show loading message, hide error message
+        loadingMessage.style.display = "flex";
+        errorMessage.style.display = "none";
+        modelViewerLoading.style.display = "flex";
+        orientationToggle.style.display = "none"; // Hide orientation toggle until loaded
         
         try {
-          // Parse volume asynchronously
-          const triangles = await parseBinarySTLAsync(arrayBuffer);
-          const volumeCm3 = await computeVolumeCm3Async(triangles);
-          
-          // Store volume in the results panel's dataset
-          resultsPanel.dataset.volume = volumeCm3;
-          
-          // Use STLLoader for geometry (fast and efficient)
-          const stlLoader = new THREE.STLLoader();
-          const geometry = stlLoader.parse(arrayBuffer);
-          
-          // Get bounding box dimensions
-          geometry.computeBoundingBox();
-          const bbox = geometry.boundingBox;
-          const sizeVec = new THREE.Vector3();
-          bbox.getSize(sizeVec);
-          
-          // Display the geometry in the viewer and get optimal orientation
-          const orientationData = displayGeometry(geometry, scene, camera, controls);
-          
-          // Store optimal dimensions and orientation in the results panel's dataset
-          resultsPanel.dataset.width = orientationData.width;
-          resultsPanel.dataset.depth = orientationData.depth;
-          resultsPanel.dataset.height = orientationData.height;
-          resultsPanel.dataset.orientation = orientationData.type;
-          resultsPanel.dataset.printTime = orientationData.printTime;
-          
-          // Set flat orientation button as active by default
-          const orientationBtns = orientationToggle.querySelectorAll('.orientation-btn');
-          orientationBtns.forEach(btn => {
-            if (btn.getAttribute('data-orientation') === 'flat') {
-              btn.classList.add('active');
-            } else {
-              btn.classList.remove('active');
-            }
+          // Read the file as ArrayBuffer
+          const arrayBuffer = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (event) => resolve(event.target.result);
+            reader.onerror = (error) => reject(error);
+            reader.readAsArrayBuffer(file);
           });
           
-          // Show orientation toggle
-          orientationToggle.style.display = "flex";
+          // Store the array buffer for packing visualization
+          row.stlArrayBuffer = arrayBuffer;
           
-          // Update the results panel
-          await updateResults(rowId);
-          
-          // Hide loading messages
-          loadingMessage.style.display = "none";
-          modelViewerLoading.style.display = "none";
-          
+          try {
+            // Use Web Worker for STL parsing if available
+            let volumeCm3;
+            
+            if (window.Worker) {
+              volumeCm3 = await new Promise((resolve, reject) => {
+                // Replace 'stl-worker.js' with the actual path to your worker script
+                const worker = new Worker('stl-worker.js');
+                
+                worker.onmessage = function(e) {
+                  if (e.data.success) {
+                    resolve(e.data.volumeCm3);
+                  } else {
+                    reject(new Error(e.data.error));
+                  }
+                  worker.terminate();
+                };
+                
+                worker.onerror = function(error) {
+                  reject(error);
+                  worker.terminate();
+                };
+                
+                worker.postMessage(arrayBuffer);
+              }).catch(async (err) => {
+                console.warn("Worker failed, falling back to main thread parsing:", err);
+                // Fallback to main thread parsing
+                const triangles = await parseBinarySTLAsync(arrayBuffer);
+                return await computeVolumeCm3Async(triangles);
+              });
+            } else {
+              // Fallback for browsers without Web Worker support
+              const triangles = await parseBinarySTLAsync(arrayBuffer);
+              volumeCm3 = await computeVolumeCm3Async(triangles);
+            }
+            
+            // Store volume in the results panel's dataset
+            resultsPanel.dataset.volume = volumeCm3;
+            
+            // Use STLLoader for geometry (fast and efficient)
+            const stlLoader = new THREE.STLLoader();
+            const geometry = stlLoader.parse(arrayBuffer);
+            
+            // Get bounding box dimensions
+            geometry.computeBoundingBox();
+            const bbox = geometry.boundingBox;
+            const sizeVec = new THREE.Vector3();
+            bbox.getSize(sizeVec);
+            
+            // Display the geometry in the viewer and get optimal orientation
+            const orientationData = displayGeometry(geometry, scene, camera, controls);
+            
+            // Store optimal dimensions and orientation in the results panel's dataset
+            resultsPanel.dataset.width = orientationData.width;
+            resultsPanel.dataset.depth = orientationData.depth;
+            resultsPanel.dataset.height = orientationData.height;
+            resultsPanel.dataset.orientation = orientationData.type;
+            resultsPanel.dataset.printTime = orientationData.printTime;
+            
+            // Set flat orientation button as active by default
+            const orientationBtns = orientationToggle.querySelectorAll('.orientation-btn');
+            orientationBtns.forEach(btn => {
+              if (btn.getAttribute('data-orientation') === 'flat') {
+                btn.classList.add('active');
+              } else {
+                btn.classList.remove('active');
+              }
+            });
+            
+            // Show orientation toggle
+            orientationToggle.style.display = "flex";
+            
+            // Update the results panel with a debounce
+            setTimeout(() => {
+              updateResults(rowId).then(() => {
+                // Hide loading messages
+                loadingMessage.style.display = "none";
+                modelViewerLoading.style.display = "none";
+              });
+            }, 10);
+            
+          } catch (err) {
+            console.error("Error processing STL:", err);
+            
+            // Show error message
+            errorMessage.textContent = `Failed to parse STL file: ${err.message || "Unknown error"}`;
+            errorMessage.style.display = "block";
+            loadingMessage.style.display = "none";
+            modelViewerLoading.style.display = "none";
+            
+            // Reset upload area
+            modelViewer.style.display = "none";
+            uploadArea.style.display = "block";
+            orientationToggle.style.display = "none";
+          }
         } catch (err) {
-          console.error("Error processing STL:", err);
+          console.error("Error reading file:", err);
           
           // Show error message
-          errorMessage.textContent = `Failed to parse STL file: ${err.message || "Unknown error"}`;
+          errorMessage.textContent = "Error reading file.";
           errorMessage.style.display = "block";
           loadingMessage.style.display = "none";
+          modelViewerLoading.style.display = "none";
           
           // Reset upload area
           modelViewer.style.display = "none";
           uploadArea.style.display = "block";
           orientationToggle.style.display = "none";
         }
-      } catch (err) {
-        console.error("Error reading file:", err);
         
-        // Show error message
-        errorMessage.textContent = "Error reading file.";
-        errorMessage.style.display = "block";
-        loadingMessage.style.display = "none";
-        
-        // Reset upload area
-        modelViewer.style.display = "none";
-        uploadArea.style.display = "block";
-        orientationToggle.style.display = "none";
+        perfMonitor.end('processSTL');
       }
       
-      perfMonitor.end('processSTL');
-    }
     
     // Initialize manual input event handlers - remove orientation toggle
     function initManualInputHandlers() {
