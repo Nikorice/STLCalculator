@@ -122,3 +122,131 @@ function loadScripts(scripts, callback) {
     // Initial update of advanced settings display
     updateAdvancedSettingsDisplay();
   });
+
+  /* Add this to the end of powder-calc-main.js */
+
+// Set up tab switching functionality
+function setupTabSwitching() {
+    const tabButtons = document.querySelectorAll('.tab-btn');
+    const tabContents = document.querySelectorAll('.tab-content');
+    
+    tabButtons.forEach(button => {
+      button.addEventListener('click', () => {
+        // Remove active class from all buttons and contents
+        tabButtons.forEach(btn => btn.classList.remove('active'));
+        tabContents.forEach(content => content.classList.remove('active'));
+        
+        // Add active class to current button
+        button.classList.add('active');
+        
+        // Show the corresponding content
+        const tabId = button.getAttribute('data-tab');
+        const tabContent = document.getElementById(`${tabId}-tab`);
+        if (tabContent) {
+          tabContent.classList.add('active');
+          
+          // If switching to manual tab and results are visible, recalculate
+          if (tabId === 'manual' && document.getElementById('manual-results').style.display === 'block') {
+            calculateManualResults();
+          }
+        }
+      });
+    });
+  }
+  
+  // Add this to the scripts loading callback in powder-calc-main.js
+  loadScripts(scripts, function() {
+    console.log('All scripts loaded successfully!');
+    
+    // Set up the "Add New STL" button
+    const addNewStlBtn = document.getElementById("addNewStl");
+    if (addNewStlBtn) {
+      addNewStlBtn.addEventListener("click", function() {
+        const rowId = createSTLRow();
+        console.log(`Created new STL row with ID: ${rowId}`);
+      });
+    } else {
+      console.error("Add New STL button not found in DOM!");
+    }
+    
+    // Initialize manual input handlers
+    initManualInputHandlers();
+    
+    // Set up Advanced Pricing Settings toggle
+    const advancedToggle = document.querySelector('.advanced-toggle');
+    if (advancedToggle) {
+      advancedToggle.addEventListener('click', () => {
+        console.log("Toggling advanced settings...");
+        advancedToggle.classList.toggle('open');
+        const advancedSettings = document.querySelector('.advanced-settings');
+        advancedSettings.classList.toggle('open');
+      });
+    } else {
+      console.error("Advanced toggle not found in DOM!");
+    }
+    
+    // Set up Apply Settings button
+    const applySettingsBtn = document.getElementById("updateSettings");
+    if (applySettingsBtn) {
+      applySettingsBtn.addEventListener("click", () => {
+        console.log("Applying settings...");
+        // Call update functions (ensure these exist in powder-calc-part4b.js or elsewhere)
+        updateAdvancedSettingsDisplay();
+        // Update WALL_MARGIN and OBJECT_SPACING if needed
+        WALL_MARGIN = parseFloat(document.getElementById("wallMargin").value) || 10;
+        OBJECT_SPACING = parseFloat(document.getElementById("objectSpacing").value) || 15;
+        updateAllResults(); // Update all calculations
+      });
+    } else {
+      console.error("Apply Settings button not found in DOM!");
+    }
+    
+    // Set up Update Pricing button
+    const updatePricingBtn = document.getElementById("updatePricing");
+    if (updatePricingBtn) {
+      updatePricingBtn.addEventListener("click", () => {
+        const currency = document.getElementById("currency").value;
+        const pricePowder = parseFloat(document.getElementById("pricePowder").value);
+        const priceBinder = parseFloat(document.getElementById("priceBinder").value);
+        const priceSilica = parseFloat(document.getElementById("priceSilica").value);
+        const priceGlaze = parseFloat(document.getElementById("priceGlaze").value);
+  
+        if (isNaN(pricePowder) || isNaN(priceBinder) || isNaN(priceSilica) || isNaN(priceGlaze) || 
+            pricePowder < 0 || priceBinder < 0 || priceSilica < 0 || priceGlaze < 0) {
+          alert("Please enter valid non-negative numbers for all prices.");
+          return;
+        }
+  
+        pricing[currency].powder = pricePowder;
+        pricing[currency].binder = priceBinder;
+        pricing[currency].silica = priceSilica;
+        pricing[currency].glaze = priceGlaze;
+  
+        updateAllResults();
+      });
+    } else {
+      console.error("Update Pricing button not found in DOM!");
+    }
+  
+    // Set up currency change
+    const currencySelector = document.getElementById("currency");
+    if (currencySelector) {
+      currencySelector.addEventListener("change", () => {
+        updateAdvancedSettingsDisplay();
+        updateAllResults();
+      });
+    } else {
+      console.error("Currency selector not found in DOM!");
+    }
+  
+    // Set up tab switching
+    setupTabSwitching();
+    
+    // Initial update of advanced settings display
+    updateAdvancedSettingsDisplay();
+    
+    // Create first STL row
+    if (document.getElementById("stlRows").children.length === 0) {
+      createSTLRow();
+    }
+  });
