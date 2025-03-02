@@ -1,4 +1,4 @@
-/* powder-calc-part3.js - Three.js Visualization Functions */
+/* powder-calc-part3.js - Consolidated Three.js Visualization Functions */
 
 /* ====================== THREE.JS FUNCTIONS ====================== */
 /* Performance Optimizations */
@@ -153,14 +153,14 @@ function initThreeJSViewer(container) {
     
     perfMonitor.end('initViewer');
     return { renderer, scene, camera, controls, cleanup };
-  }
+}
   
-  // Setup viewer controls
-  function setupViewerControls(container, scene, camera, controls, renderer) {
+// Setup viewer controls
+function setupViewerControls(container, scene, camera, controls, renderer) {
     // Get control buttons
-    const resetCameraBtn = container.querySelector('#reset-camera');
-    const toggleWireframeBtn = container.querySelector('#toggle-wireframe');
-    const takeScreenshotBtn = container.querySelector('#take-screenshot');
+    const resetCameraBtn = container.querySelector('.reset-camera-btn');
+    const toggleWireframeBtn = container.querySelector('.toggle-wireframe-btn');
+    const takeScreenshotBtn = container.querySelector('.take-screenshot-btn');
     
     // Reset camera button
     if (resetCameraBtn) {
@@ -305,7 +305,7 @@ function initThreeJSViewer(container) {
         }
       });
     }
-  }
+}
   
 // Enhanced version of displayGeometry that makes the STL object sit on a flat grid
 function displayGeometry(geometry, scene, camera, controls) {
@@ -423,11 +423,10 @@ function displayGeometry(geometry, scene, camera, controls) {
   
     perfMonitor.end('displayModel');
     return orientationData;
-  }
+}
   
-  
-  // Enhanced axis helpers
-  function addEnhancedAxisHelpers(scene, size) {
+// Enhanced axis helpers
+function addEnhancedAxisHelpers(scene, size) {
     // Remove existing axis helpers
     scene.traverse(child => {
       if (child.isAxesHelper) {
@@ -453,10 +452,10 @@ function displayGeometry(geometry, scene, camera, controls) {
     
     // Add axis labels for better understanding
     addAxisLabels(scene, size);
-  }
+}
   
-  // Add axis labels
-  function addAxisLabels(scene, size) {
+// Add axis labels
+function addAxisLabels(scene, size) {
     // Remove existing labels
     scene.traverse(child => {
       if (child.userData && child.userData.isAxisLabel) {
@@ -508,10 +507,10 @@ function displayGeometry(geometry, scene, camera, controls) {
     scene.add(xLabel);
     scene.add(yLabel);
     scene.add(zLabel);
-  }
+}
   
-  // Add grid for better spatial reference
-  function addGrid(scene, size) {
+// Add grid for better spatial reference
+function addGrid(scene, size) {
     // Remove existing grids
     scene.traverse(child => {
       if (child.isGridHelper) {
@@ -560,10 +559,10 @@ function displayGeometry(geometry, scene, camera, controls) {
         }
       }
     });
-  }
+}
   
-  // Enhanced version of changeOrientation
-  function changeOrientation(scene, camera, controls, orientationType) {
+// Enhanced version of changeOrientation
+function changeOrientation(scene, camera, controls, orientationType) {
     if (!scene.userData || !scene.userData.mesh) return null;
     
     const mesh = scene.userData.mesh;
@@ -658,22 +657,13 @@ function displayGeometry(geometry, scene, camera, controls) {
     }
     
     return orientationData;
-  }
+}
   
-  // Enhanced packing visualization with clearer layout and labels
-  function visualizePacking(
-    printer,
-    objWidth,
-    objDepth,
-    objHeight,
-    positions,
-    container,
-    stlGeometry,
-    orientationType
-  ) {
+// Enhanced packing visualization with clearer layout and labels
+function visualizePacking(printer, objWidth, objDepth, objHeight, positions, container, stlGeometry, orientationType) {
     perfMonitor.start('visualizePacking');
     
-    // Clean up old renderer and resources completely
+    // Clean up old renderer
     if (container.cleanup) {
       container.cleanup();
     }
@@ -681,6 +671,9 @@ function displayGeometry(geometry, scene, camera, controls) {
     while (container.firstChild) {
       container.removeChild(container.firstChild);
     }
+    
+    // Check for dark mode
+    const isDarkMode = document.documentElement.getAttribute('data-theme') === 'dark';
     
     // Show "exceeds capacity" if no positions
     if (!positions || positions.length === 0) {
@@ -701,16 +694,28 @@ function displayGeometry(geometry, scene, camera, controls) {
       return;
     }
     
-    // Check for dark mode
-    const isDarkMode = document.documentElement.getAttribute('data-theme') === 'dark';
+    // Create dimension label
+    const dimensionLabel = document.createElement('div');
+    dimensionLabel.className = 'dimension-label';
+    dimensionLabel.style.position = 'absolute';
+    dimensionLabel.style.bottom = '10px';
+    dimensionLabel.style.left = '10px';
+    dimensionLabel.style.backgroundColor = isDarkMode ? 'rgba(15, 23, 42, 0.8)' : 'rgba(255, 255, 255, 0.8)';
+    dimensionLabel.style.padding = '5px 8px';
+    dimensionLabel.style.borderRadius = '4px';
+    dimensionLabel.style.fontSize = '12px';
+    dimensionLabel.style.color = isDarkMode ? '#e2e8f0' : '#1e293b';
+    dimensionLabel.style.pointerEvents = 'none';
+    dimensionLabel.textContent = `${printer.width}mm × ${printer.depth}mm × ${printer.height}mm`;
+    container.appendChild(dimensionLabel);
     
     try {
       // Create renderer with more conservative settings
-      const renderer = new THREE.WebGLRenderer({ 
+      const renderer = new THREE.WebGLRenderer({
         antialias: false, // Disable antialiasing for better performance
         alpha: true,
         powerPreference: 'default',
-        precision: 'lowp'  // Use low precision for better performance
+        precision: 'lowp' // Use low precision for better performance
       });
       
       renderer.setSize(container.clientWidth, container.clientHeight);
@@ -726,11 +731,11 @@ function displayGeometry(geometry, scene, camera, controls) {
       const frustumSize = Math.max(printer.width, printer.depth, printer.height) * 1.2;
       
       const camera = new THREE.OrthographicCamera(
-        frustumSize * aspect / -2, 
+        frustumSize * aspect / -2,
         frustumSize * aspect / 2,
-        frustumSize / 2, 
+        frustumSize / 2,
         frustumSize / -2,
-        0.1, 
+        0.1,
         1000
       );
       
@@ -754,12 +759,12 @@ function displayGeometry(geometry, scene, camera, controls) {
       dirLight.position.set(isoDist, -isoDist, isoDist);
       scene.add(dirLight);
       
-      // Create printer outline with improved performance
+      // Create printer outline
       createEnhancedPrinterOutline(scene, printer, isDarkMode);
       
       // Create base plate with better visual appearance
       const basePlateGeom = new THREE.BoxGeometry(printer.width, printer.depth, 1);
-      const basePlateMat = new THREE.MeshBasicMaterial({  // Use MeshBasicMaterial instead of PhongMaterial
+      const basePlateMat = new THREE.MeshBasicMaterial({ // Use MeshBasicMaterial instead of PhongMaterial
         color: isDarkMode ? 0x334155 : 0xf1f5f9,
         opacity: 0.7,
         transparent: true
@@ -768,9 +773,146 @@ function displayGeometry(geometry, scene, camera, controls) {
       basePlate.position.set(printer.width/2, printer.depth/2, 0.5);
       scene.add(basePlate);
       
-      // Rest of the function remains the same...
+      // Add grid to base plate
+      const gridHelper = new THREE.GridHelper(
+        Math.max(printer.width, printer.depth),
+        10,
+        isDarkMode ? 0x475569 : 0xd1d5db,
+        isDarkMode ? 0x334155 : 0xe2e8f0
+      );
+      gridHelper.rotation.x = Math.PI / 2;
+      gridHelper.position.set(printer.width/2, printer.depth/2, 1.1);
+      scene.add(gridHelper);
       
-      // But modify the rendering loop for better performance
+      // Enhanced axis lines and labels
+      const axisLength = Math.max(printer.width, printer.depth, printer.height) * 0.4;
+      
+      // X axis (red)
+      const xAxisGeom = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(axisLength, 0, 0)
+      ]);
+      const xAxis = new THREE.Line(xAxisGeom, new THREE.LineBasicMaterial({
+        color: 0xff4a4a,
+        linewidth: 2
+      }));
+      scene.add(xAxis);
+      
+      // Y axis (green)
+      const yAxisGeom = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(0, axisLength, 0)
+      ]);
+      const yAxis = new THREE.Line(yAxisGeom, new THREE.LineBasicMaterial({
+        color: 0x4aff4a,
+        linewidth: 2
+      }));
+      scene.add(yAxis);
+      
+      // Z axis (blue)
+      const zAxisGeom = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(0, 0, axisLength)
+      ]);
+      const zAxis = new THREE.Line(zAxisGeom, new THREE.LineBasicMaterial({
+        color: 0x4a4aff,
+        linewidth: 2
+      }));
+      scene.add(zAxis);
+      
+      // Create axis labels
+      const createLabel = (text, position, color) => {
+        const div = document.createElement('div');
+        div.textContent = text;
+        div.style.position = 'absolute';
+        div.style.color = color;
+        div.style.backgroundColor = isDarkMode ? 'rgba(15, 23, 42, 0.7)' : 'rgba(255, 255, 255, 0.7)';
+        div.style.padding = '3px 6px';
+        div.style.borderRadius = '3px';
+        div.style.fontWeight = 'bold';
+        div.style.fontSize = '14px';
+        div.style.fontFamily = '"Inter", sans-serif';
+        div.style.textShadow = isDarkMode ? 'none' : '1px 1px 1px rgba(255,255,255,0.7)';
+        div.style.pointerEvents = 'none';
+        container.appendChild(div);
+        return { element: div, position };
+      };
+      
+      const labels = [
+        createLabel('X', new THREE.Vector3(axisLength + 5, 0, 0), '#ff4a4a'),
+        createLabel('Y', new THREE.Vector3(0, axisLength + 5, 0), '#4aff4a'),
+        createLabel('Z', new THREE.Vector3(0, 0, axisLength + 5), '#4a4aff')
+      ];
+      
+      // Create objects
+      if (stlGeometry) {
+        // Parse bounding box once
+        const stlBbox = new THREE.Box3().setFromObject(new THREE.Mesh(stlGeometry));
+        const stlSize = new THREE.Vector3();
+        stlBbox.getSize(stlSize);
+        
+        positions.forEach(pos => {
+          // Create object material with translucent effect
+          const objectMat = new THREE.MeshBasicMaterial({
+            color: 0x10b981, // Green color
+            opacity: 0.8,
+            transparent: true
+          });
+          
+          // Create a mesh from the STL
+          const stlMesh = new THREE.Mesh(stlGeometry.clone(), objectMat);
+          
+          // Store original for orientation
+          stlMesh.userData.originalGeometry = stlGeometry.clone();
+          stlMesh.userData.originalSize = stlSize.clone();
+          
+          // Apply the same orientation user selected
+          applyOrientation(stlMesh, stlMesh.userData.originalSize, orientationType);
+          
+          // Scale to correct dimensions
+          stlMesh.geometry.computeBoundingBox();
+          const orientedBbox = stlMesh.geometry.boundingBox;
+          const orientedSize = new THREE.Vector3();
+          orientedBbox.getSize(orientedSize);
+          
+          const scaleX = objWidth / orientedSize.x;
+          const scaleY = objDepth / orientedSize.y;
+          const scaleZ = objHeight / orientedSize.z;
+          stlMesh.scale.set(scaleX, scaleY, scaleZ);
+          
+          // Recompute bounding box after scaling
+          stlMesh.geometry.computeBoundingBox();
+          const finalBbox = stlMesh.geometry.boundingBox;
+          
+          // Position so that bottom corner is at pos.x, pos.y, pos.z
+          stlMesh.position.set(
+            pos.x - finalBbox.min.x,
+            pos.y - finalBbox.min.y,
+            pos.z - finalBbox.min.z
+          );
+          
+          scene.add(stlMesh);
+        });
+      } else {
+        // If no STL geometry, use simple boxes
+        positions.forEach(pos => {
+          const boxGeom = new THREE.BoxGeometry(objWidth, objDepth, objHeight);
+          const boxMat = new THREE.MeshBasicMaterial({
+            color: 0x10b981,
+            opacity: 0.8,
+            transparent: true
+          });
+          const box = new THREE.Mesh(boxGeom, boxMat);
+          box.position.set(
+            pos.x + objWidth/2,
+            pos.y + objDepth/2,
+            pos.z + objHeight/2
+          );
+          scene.add(box);
+        });
+      }
+      
+      // Simplified animation loop
       let animationId;
       let active = true;
       
@@ -781,14 +923,12 @@ function displayGeometry(geometry, scene, camera, controls) {
         controls.update();
         renderer.render(scene, camera);
         
-        // Update label positions (if needed)
-        if (labels && labels.length > 0) {
-          labels.forEach(label => {
-            const screenPos = label.position.clone().project(camera);
-            label.element.style.left = `${(screenPos.x * 0.5 + 0.5) * container.clientWidth}px`;
-            label.element.style.top = `${(-screenPos.y * 0.5 + 0.5) * container.clientHeight}px`;
-          });
-        }
+        // Update label positions
+        labels.forEach(label => {
+          const screenPos = label.position.clone().project(camera);
+          label.element.style.left = `${(screenPos.x * 0.5 + 0.5) * container.clientWidth}px`;
+          label.element.style.top = `${(-screenPos.y * 0.5 + 0.5) * container.clientHeight}px`;
+        });
       }
       
       // Start animation with a short delay
@@ -796,7 +936,39 @@ function displayGeometry(geometry, scene, camera, controls) {
         animate();
       }, 100);
       
-      // Improved cleanup function that completely removes all resources
+      // Responsive resize handling
+      const resizeObserver = new ResizeObserver(() => {
+        renderer.setSize(container.clientWidth, container.clientHeight);
+        const aspect = container.clientWidth / container.clientHeight;
+        camera.left = frustumSize * aspect / -2;
+        camera.right = frustumSize * aspect / 2;
+        camera.top = frustumSize / 2;
+        camera.bottom = frustumSize / -2;
+        camera.updateProjectionMatrix();
+      });
+      resizeObserver.observe(container);
+      
+      // Theme change listener
+      const themeChangeListener = (e) => {
+        const isDark = e.detail.theme === 'dark';
+        scene.background = new THREE.Color(isDark ? 0x1e293b : 0xffffff);
+        
+        // Update base plate
+        basePlateMat.color.set(isDark ? 0x334155 : 0xf1f5f9);
+        
+        // Update labels
+        dimensionLabel.style.backgroundColor = isDark ? 'rgba(15, 23, 42, 0.8)' : 'rgba(255, 255, 255, 0.8)';
+        dimensionLabel.style.color = isDark ? '#e2e8f0' : '#1e293b';
+        
+        labels.forEach(label => {
+          label.element.style.backgroundColor = isDark ? 'rgba(15, 23, 42, 0.7)' : 'rgba(255, 255, 255, 0.7)';
+          label.element.style.textShadow = isDark ? 'none' : '1px 1px 1px rgba(255,255,255,0.7)';
+        });
+      };
+      
+      document.addEventListener('themeChanged', themeChangeListener);
+      
+      // Improved cleanup function
       container.cleanup = () => {
         active = false;
         if (animationId) {
@@ -809,12 +981,15 @@ function displayGeometry(geometry, scene, camera, controls) {
         
         document.removeEventListener('themeChanged', themeChangeListener);
         
-        if (labels && labels.length > 0) {
-          labels.forEach(label => {
-            if (label.element && label.element.parentNode) {
-              label.element.parentNode.removeChild(label.element);
-            }
-          });
+        // Remove all DOM elements
+        labels.forEach(label => {
+          if (label.element && label.element.parentNode) {
+            label.element.parentNode.removeChild(label.element);
+          }
+        });
+        
+        if (dimensionLabel && dimensionLabel.parentNode) {
+          dimensionLabel.parentNode.removeChild(dimensionLabel);
         }
         
         // Dispose of all scene objects
@@ -841,7 +1016,6 @@ function displayGeometry(geometry, scene, camera, controls) {
         THREE.Cache.clear();
       };
       
-      perfMonitor.end('visualizePacking');
     } catch (error) {
       console.error("Error in visualizePacking:", error);
       
@@ -859,321 +1033,13 @@ function displayGeometry(geometry, scene, camera, controls) {
         <span>Visualization error: ${error.message}</span>
       `;
       container.appendChild(errorMessage);
-      perfMonitor.end('visualizePacking');
     }
-  }
-    // Check for dark mode
-    const isDarkMode = document.documentElement.getAttribute('data-theme') === 'dark';
-    
-    // Create renderer
-    const renderer = new THREE.WebGLRenderer({ 
-      antialias: window.devicePixelRatio < 2,
-      alpha: true,
-      powerPreference: 'high-performance',
-      precision: 'mediump'
-    });
-    renderer.setSize(container.clientWidth, container.clientHeight);
-    renderer.setClearColor(isDarkMode ? 0x1e293b : 0xffffff, 1);
-    container.appendChild(renderer.domElement);
-    
-    // Create scene
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(isDarkMode ? 0x1e293b : 0xffffff);
-    
-    // Use orthographic camera for clearer packing visualization
-    const aspect = container.clientWidth / container.clientHeight;
-    const frustumSize = Math.max(printer.width, printer.depth, printer.height) * 1.2;
-    
-    const camera = new THREE.OrthographicCamera(
-      frustumSize * aspect / -2, 
-      frustumSize * aspect / 2,
-      frustumSize / 2, 
-      frustumSize / -2,
-      0.1, 
-      1000
-    );
-    
-    const isoDist = Math.max(printer.width, printer.depth, printer.height) * 0.7;
-    camera.position.set(isoDist, -isoDist, isoDist);
-    camera.lookAt(printer.width/2, printer.depth/2, printer.height/2);
-    
-    // Add controls with damping for smoother interaction
-    const controls = new THREE.OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.2;
-    controls.minZoom = 0.5;
-    controls.maxZoom = 2;
-    controls.target.set(printer.width/2, printer.depth/2, printer.height/2);
-    controls.update();
-    
-    // Enhanced lighting
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
-    scene.add(ambientLight);
-    
-    const dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
-    dirLight.position.set(isoDist, -isoDist, isoDist);
-    scene.add(dirLight);
-    
-    // Add a subtle hemisphere light
-    const hemiLight = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 0.3);
-    scene.add(hemiLight);
-    
-    // Create enhanced printer outline
-    createEnhancedPrinterOutline(scene, printer, isDarkMode);
-    
-    // Create base plate with better visual appearance
-    const basePlateGeom = new THREE.BoxGeometry(printer.width, printer.depth, 1);
-    const basePlateMat = new THREE.MeshPhongMaterial({
-      color: isDarkMode ? 0x334155 : 0xf1f5f9,
-      opacity: 0.7,
-      transparent: true,
-      flatShading: true
-    });
-    const basePlate = new THREE.Mesh(basePlateGeom, basePlateMat);
-    basePlate.position.set(printer.width/2, printer.depth/2, 0.5);
-    scene.add(basePlate);
-    
-    // Add grid to base plate for better visual reference
-    const gridHelper = new THREE.GridHelper(
-      Math.max(printer.width, printer.depth), 
-      10,
-      isDarkMode ? 0x475569 : 0xd1d5db,
-      isDarkMode ? 0x334155 : 0xe2e8f0
-    );
-    gridHelper.rotation.x = Math.PI / 2;
-    gridHelper.position.set(printer.width/2, printer.depth/2, 1.1);
-    scene.add(gridHelper);
-    
-    // Enhanced axis lines
-    const axisLength = Math.max(printer.width, printer.depth, printer.height) * 0.4;
-    
-    const xAxisGeom = new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(0, 0, 0),
-      new THREE.Vector3(axisLength, 0, 0)
-    ]);
-    const xAxis = new THREE.Line(xAxisGeom, new THREE.LineBasicMaterial({ 
-      color: 0xff4a4a,
-      linewidth: 2
-    }));
-    scene.add(xAxis);
-    
-    const yAxisGeom = new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(0, 0, 0),
-      new THREE.Vector3(0, axisLength, 0)
-    ]);
-    const yAxis = new THREE.Line(yAxisGeom, new THREE.LineBasicMaterial({ 
-      color: 0x4aff4a,
-      linewidth: 2
-    }));
-    scene.add(yAxis);
-    
-    const zAxisGeom = new THREE.BufferGeometry().setFromPoints([
-      new THREE.Vector3(0, 0, 0),
-      new THREE.Vector3(0, 0, axisLength)
-    ]);
-    const zAxis = new THREE.Line(zAxisGeom, new THREE.LineBasicMaterial({ 
-      color: 0x4a4aff,
-      linewidth: 2
-    }));
-    scene.add(zAxis);
-    
-    // Enhanced axis labels with better visibility
-    const createLabel = (text, position, color) => {
-      const div = document.createElement('div');
-      div.textContent = text;
-      div.style.position = 'absolute';
-      div.style.color = color;
-      div.style.backgroundColor = isDarkMode ? 'rgba(15, 23, 42, 0.7)' : 'rgba(255, 255, 255, 0.7)';
-      div.style.padding = '3px 6px';
-      div.style.borderRadius = '3px';
-      div.style.fontWeight = 'bold';
-      div.style.fontSize = '14px';
-      div.style.fontFamily = '"Inter", sans-serif';
-      div.style.textShadow = isDarkMode ? 'none' : '1px 1px 1px rgba(255,255,255,0.7)';
-      div.style.pointerEvents = 'none';
-      container.appendChild(div);
-      return { element: div, position };
-    };
-    
-    const labels = [
-      createLabel('X', new THREE.Vector3(axisLength + 5, 0, 0), '#ff4a4a'),
-      createLabel('Y', new THREE.Vector3(0, axisLength + 5, 0), '#4aff4a'),
-      createLabel('Z', new THREE.Vector3(0, 0, axisLength + 5), '#4a4aff')
-    ];
-    
-    
-    // Create objects with enhanced materials
-    if (stlGeometry) {
-      // Parse bounding box once
-      const stlBbox = new THREE.Box3().setFromObject(new THREE.Mesh(stlGeometry));
-      const stlSize = new THREE.Vector3();
-      stlBbox.getSize(stlSize);
-      
-      positions.forEach(pos => {
-        // Create object material with translucent effect
-        const objectMat = new THREE.MeshPhysicalMaterial({
-          color: 0x10b981,   // Green color
-          opacity: 0.8,
-          transparent: true,
-          flatShading: true,
-          metalness: 0.1,
-          roughness: 0.5,
-          clearcoat: 0.2
-        });
-        
-        // Create a mesh from the STL
-        const stlMesh = new THREE.Mesh(stlGeometry.clone(), objectMat);
-        
-        // Store original so we can orient it
-        stlMesh.userData.originalGeometry = stlGeometry.clone();
-        stlMesh.userData.originalSize = stlSize.clone();
-        
-        // Apply the same orientation user selected
-        applyOrientation(stlMesh, stlMesh.userData.originalSize, orientationType);
-        
-        // Scale to correct dimensions
-        stlMesh.geometry.computeBoundingBox();
-        const orientedBbox = stlMesh.geometry.boundingBox;
-        const orientedSize = new THREE.Vector3();
-        orientedBbox.getSize(orientedSize);
-        
-        const scaleX = objWidth / orientedSize.x;
-        const scaleY = objDepth / orientedSize.y;
-        const scaleZ = objHeight / orientedSize.z;
-        stlMesh.scale.set(scaleX, scaleY, scaleZ);
-        
-        // Recompute bounding box after scaling
-        stlMesh.geometry.computeBoundingBox();
-        const finalBbox = stlMesh.geometry.boundingBox;
-        
-        // Position so that bottom corner is at pos.x, pos.y, pos.z
-        stlMesh.position.set(
-          pos.x - finalBbox.min.x,
-          pos.y - finalBbox.min.y,
-          pos.z - finalBbox.min.z
-        );
-        
-        scene.add(stlMesh);
-      });
-    } else {
-      // If no STL geometry, use simple boxes to represent objects
-      positions.forEach(pos => {
-        const boxGeom = new THREE.BoxGeometry(objWidth, objDepth, objHeight);
-        const boxMat = new THREE.MeshPhysicalMaterial({
-          color: 0x10b981,
-          opacity: 0.8,
-          transparent: true,
-          flatShading: true,
-          metalness: 0.1,
-          roughness: 0.5
-        });
-        const box = new THREE.Mesh(boxGeom, boxMat);
-        box.position.set(
-          pos.x + objWidth/2,
-          pos.y + objDepth/2,
-          pos.z + objHeight/2
-        );
-        scene.add(box);
-      });
-    }
-    
-    // Smooth animation
-    let animationId;
-    let lastRenderTime = 0;
-    function animate(time) {
-      animationId = requestAnimationFrame(animate);
-      if (time - lastRenderTime < 33) return;
-      lastRenderTime = time;
-      
-      controls.update();
-      renderer.render(scene, camera);
-      
-      // Update label positions
-      labels.forEach(label => {
-        const screenPos = label.position.clone().project(camera);
-        label.element.style.left = `${(screenPos.x * 0.5 + 0.5) * container.clientWidth}px`;
-        label.element.style.top = `${(-screenPos.y * 0.5 + 0.5) * container.clientHeight}px`;
-      });
-    }
-    animate(0);
-    
-    // Responsive resize handling
-    const resizeObserver = new ResizeObserver(() => {
-      renderer.setSize(container.clientWidth, container.clientHeight);
-      const aspect = container.clientWidth / container.clientHeight;
-      camera.left = frustumSize * aspect / -2;
-      camera.right = frustumSize * aspect / 2;
-      camera.top = frustumSize / 2;
-      camera.bottom = frustumSize / -2;
-      camera.updateProjectionMatrix();
-    });
-    resizeObserver.observe(container);
-    
-    // Theme change listener
-    const themeChangeListener = (e) => {
-      const isDark = e.detail.theme === 'dark';
-      scene.background = new THREE.Color(isDark ? 0x1e293b : 0xffffff);
-      
-      // Update base plate
-      basePlateMat.color.set(isDark ? 0x334155 : 0xf1f5f9);
-      
-      // Update grid
-      gridHelper.material.colors = [
-        new THREE.Color(isDark ? 0x475569 : 0xd1d5db),
-        new THREE.Color(isDark ? 0x334155 : 0xe2e8f0)
-      ];
-      
-      // Update dimension label
-      dimensionLabel.style.backgroundColor = isDark ? 'rgba(15, 23, 42, 0.8)' : 'rgba(255, 255, 255, 0.8)';
-      dimensionLabel.style.color = isDark ? '#e2e8f0' : '#1e293b';
-      
-      // Update axis labels
-      labels.forEach(label => {
-        label.element.style.backgroundColor = isDark ? 'rgba(15, 23, 42, 0.7)' : 'rgba(255, 255, 255, 0.7)';
-        label.element.style.textShadow = isDark ? 'none' : '1px 1px 1px rgba(255,255,255,0.7)';
-      });
-    };
-    
-    document.addEventListener('themeChanged', themeChangeListener);
-    
-    // Enhanced cleanup
-    container.cleanup = () => {
-      if (animationId) cancelAnimationFrame(animationId);
-      if (resizeObserver) resizeObserver.disconnect();
-      document.removeEventListener('themeChanged', themeChangeListener);
-      
-      labels.forEach(label => {
-        if (label.element && label.element.parentNode) {
-          label.element.parentNode.removeChild(label.element);
-        }
-      });
-      
-      if (dimensionLabel && dimensionLabel.parentNode) {
-        dimensionLabel.parentNode.removeChild(dimensionLabel);
-      }
-      
-      scene.traverse(obj => {
-        if (obj.geometry) obj.geometry.dispose();
-        if (obj.material) {
-          if (Array.isArray(obj.material)) {
-            obj.material.forEach(m => m.dispose());
-          } else {
-            obj.material.dispose();
-          }
-        }
-      });
-      
-      if (renderer.domElement && renderer.domElement.parentNode) {
-        renderer.domElement.parentNode.removeChild(renderer.domElement);
-      }
-      renderer.dispose();
-    };
     
     perfMonitor.end('visualizePacking');
+}
   
-  
-  // Create enhanced printer outline
-  function createEnhancedPrinterOutline(scene, printer, isDarkMode) {
+// Create enhanced printer outline
+function createEnhancedPrinterOutline(scene, printer, isDarkMode) {
     const w = printer.width;
     const d = printer.depth;
     const h = printer.height;
@@ -1272,10 +1138,81 @@ function displayGeometry(geometry, scene, camera, controls) {
     const heightGeometry = new THREE.BufferGeometry().setFromPoints(heightPoints);
     const heightLine = new THREE.Line(heightGeometry, dimLineMaterial);
     scene.add(heightLine);
-  }
+}
+
+// Apply orientation to mesh (resets from original geometry)
+function applyOrientation(mesh, originalSize, orientationType) {
+    console.log(`Applying orientation: ${orientationType}`);
+    
+    // Reset mesh
+    mesh.rotation.set(0, 0, 0);
+    mesh.position.set(0, 0, 0);
+    mesh.scale.set(1, 1, 1);
+    mesh.updateMatrix();
+    
+    // Get a clean copy of the original geometry
+    const baseGeometry = mesh.userData.originalGeometry
+      ? mesh.userData.originalGeometry.clone()
+      : mesh.geometry.clone();
+    
+    // Find dimensions and their corresponding axes
+    const dimensions = [
+      { axis: 'x', value: originalSize.x },
+      { axis: 'y', value: originalSize.y },
+      { axis: 'z', value: originalSize.z }
+    ];
+    
+    dimensions.sort((a, b) => b.value - a.value);
+    const longestAxis = dimensions[0].axis;
+    const shortestAxis = dimensions[2].axis;
+    
+    // Create a rotation matrix
+    let rotMatrix = new THREE.Matrix4();
+    
+    if (orientationType === "vertical") {
+      // We want the longest dimension on the Z axis
+      if (longestAxis === 'x') {
+        rotMatrix.makeRotationX(0);
+        rotMatrix.multiply(new THREE.Matrix4().makeRotationZ(-Math.PI/2));
+      } else if (longestAxis === 'y') {
+        rotMatrix.makeRotationY(0);
+        rotMatrix.multiply(new THREE.Matrix4().makeRotationX(Math.PI/2));
+      } else {
+        // Already on Z, no rotation needed
+        rotMatrix.identity();
+      }
+    } else {
+      // "flat" orientation - shortest dimension on Z
+      if (shortestAxis === 'x') {
+        rotMatrix.makeRotationY(Math.PI/2);
+      } else if (shortestAxis === 'y') {
+        rotMatrix.makeRotationX(Math.PI/2);
+      } else {
+        // Already on Z, no rotation needed
+        rotMatrix.identity();
+      }
+    }
+    
+    // Apply rotation
+    baseGeometry.applyMatrix4(rotMatrix);
+    
+    // Replace mesh geometry
+    mesh.geometry.dispose();
+    mesh.geometry = baseGeometry;
+    
+    // Center the geometry on the XY plane with bottom at Z=0
+    baseGeometry.computeBoundingBox();
+    const bbox = baseGeometry.boundingBox;
+    const center = new THREE.Vector3();
+    bbox.getCenter(center);
+    
+    mesh.position.set(-center.x, -center.y, -bbox.min.z);
+    
+    return baseGeometry;
+}
   
-  // Determine the optimal orientation for an object (longest dimension = vertical or default to flat, etc.)
-  function determineOptimalOrientation(width, depth, height) {
+// Determine the optimal orientation for an object (longest dimension = vertical or default to flat, etc.)
+function determineOptimalOrientation(width, depth, height) {
     const dimensions = [
       { value: width, name: 'width' },
       { value: depth, name: 'depth' },
@@ -1336,80 +1273,10 @@ function displayGeometry(geometry, scene, camera, controls) {
     orientation.type = "flat";
     
     return orientation;
-  }
-  
-  // Apply orientation to mesh (resets from original geometry)
-function applyOrientation(mesh, originalSize, orientationType) {
-    // Reset
-    mesh.rotation.set(0, 0, 0);
-    mesh.updateMatrix();
-    mesh.matrix.identity();
-    
-    // Use unmodified geometry
-    const baseGeometry = mesh.userData.originalGeometry
-      ? mesh.userData.originalGeometry
-      : mesh.geometry;
-    const newGeometry = baseGeometry.clone();
-    
-    // Determine dimensions
-    const origWidth = originalSize.x;
-    const origDepth = originalSize.y;
-    const origHeight = originalSize.z;
-    const origDimensions = [
-      { value: origWidth, axis: 'x' },
-      { value: origDepth, axis: 'y' },
-      { value: origHeight, axis: 'z' }
-    ];
-    origDimensions.sort((a, b) => b.value - a.value); // Sort descending
-    
-    const maxDimAxis = origDimensions[0].axis; // Longest dimension
-    const minDimAxis = origDimensions[2].axis; // Shortest dimension
-    
-    let rotationMatrix = new THREE.Matrix4();
-    
-    if (orientationType === "vertical") {
-        // Need to put longest dimension on Z-axis
-        if (maxDimAxis === 'x') {
-            // Rotate 90 degrees around Y to put X on Z
-            rotationMatrix.makeRotationY(Math.PI / 2);
-        } else if (maxDimAxis === 'y') {
-            // Rotate -90 degrees around X to put Y on Z
-            rotationMatrix.makeRotationX(-Math.PI / 2);
-        }
-        // If maxDimAxis is already Z, no rotation needed
-    } else { // "flat" orientation
-        // Need to put shortest dimension on Z-axis
-        if (minDimAxis === 'x') {
-            // Rotate 90 degrees around Y to put X on Z
-            rotationMatrix.makeRotationY(Math.PI / 2);
-        } else if (minDimAxis === 'y') {
-            // Rotate -90 degrees around X to put Y on Z
-            rotationMatrix.makeRotationX(-Math.PI / 2);
-        }
-        // If minDimAxis is already Z, no rotation needed
-    }
-    
-    // Apply rotation
-    newGeometry.applyMatrix4(rotationMatrix);
-    
-    // Update mesh
-    mesh.geometry.dispose();
-    mesh.geometry = newGeometry;
-    
-    // Re-center and position so bottom is at Z=0
-    newGeometry.computeBoundingBox();
-    const bbox = newGeometry.boundingBox;
-    const center = new THREE.Vector3();
-    bbox.getCenter(center);
-    
-    // Position so bottom is at Z=0
-    mesh.position.set(-center.x, -center.y, -bbox.min.z);
-    
-    return newGeometry;
 }
-  
-  // Load STL for packing
-  async function loadSTLModelForPacking(stlData) {
+
+// Load STL for packing
+async function loadSTLModelForPacking(stlData) {
     return new Promise((resolve, reject) => {
       try {
         const loader = new THREE.STLLoader();
@@ -1420,7 +1287,30 @@ function applyOrientation(mesh, originalSize, orientationType) {
         reject(error);
       }
     });
-  }
-  
-  // Implementing a cache for visualizations
-  const packingVisCache = new Map();
+}
+
+// Helper function to format time
+function formatPrintTime(seconds) {
+    if (isNaN(seconds) || seconds === "N/A") return "N/A";
+    
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`;
+    } else {
+      return `${minutes}m`;
+    }
+}
+
+// Implementing a cache for visualizations
+const packingVisCache = new Map();
+
+// Export functions for use in other modules
+window.displayGeometry = displayGeometry;
+window.changeOrientation = changeOrientation;
+window.visualizePacking = visualizePacking;
+window.applyOrientation = applyOrientation;
+window.determineOptimalOrientation = determineOptimalOrientation;
+window.initThreeJSViewer = initThreeJSViewer;
+window.formatPrintTime = formatPrintTime;

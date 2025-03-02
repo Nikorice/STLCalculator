@@ -658,8 +658,27 @@ function initThreeJSViewer(container) {
     orientationType
   ) {
     perfMonitor.start('visualizePacking');
+
+      // Create dimension label
+  const dimensionLabel = document.createElement('div');
+  dimensionLabel.className = 'dimension-label';
+  dimensionLabel.style.position = 'absolute';
+  dimensionLabel.style.bottom = '10px';
+  dimensionLabel.style.left = '10px';
+  dimensionLabel.style.backgroundColor = isDarkMode ? 'rgba(15, 23, 42, 0.8)' : 'rgba(255, 255, 255, 0.8)';
+  dimensionLabel.style.padding = '5px 8px';
+  dimensionLabel.style.borderRadius = '4px';
+  dimensionLabel.style.fontSize = '12px';
+  dimensionLabel.style.color = isDarkMode ? '#e2e8f0' : '#1e293b';
+  dimensionLabel.style.pointerEvents = 'none';
+  dimensionLabel.textContent = `${printer.width}mm × ${printer.depth}mm × ${printer.height}mm`;
+  container.appendChild(dimensionLabel);
     
     // Clean up old renderer
+
+    
+  // Make sure we handle the dimensionLabel in the cleanup function
+  container.cleanup = () => {
     if (container.cleanup) {
       container.cleanup();
     }
@@ -667,6 +686,11 @@ function initThreeJSViewer(container) {
       container.removeChild(container.firstChild);
     }
     
+    if (dimensionLabel && dimensionLabel.parentNode) {
+        dimensionLabel.parentNode.removeChild(dimensionLabel);
+      }
+    }
+
     // Show "exceeds capacity" if no positions
     if (!positions || positions.length === 0) {
       const message = document.createElement("div");

@@ -1037,3 +1037,17 @@ const UNITS = {
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   }
+
+
+// Or to your main.js file if you have one
+
+// Fix for async event handlers
+document.addEventListener('DOMContentLoaded', function() {
+    // Fix for message channel errors
+    window.addEventListener('unhandledrejection', function(event) {
+      // Prevent the default handler
+      event.preventDefault();
+      // Log the error in a controlled way
+      console.warn('Unhandled promise rejection:', event.reason);
+    });
+  });

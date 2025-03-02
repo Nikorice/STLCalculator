@@ -31,7 +31,6 @@ function loadScripts(scripts, callback) {
     'powder-calc-part3.js',  // Three.js visualizations
     'powder-calc-part4a.js', // UI core functions
     'powder-calc-part4b.js', // Calculation & event handlers
-    'three-enhancements.js', // Enhanced Three.js viewer
     'main-integration.js'    // Additional integration if needed
   ];
   
