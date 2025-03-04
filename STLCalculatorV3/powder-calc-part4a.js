@@ -399,3 +399,28 @@ function createUniqueId() {
     perfMonitor.end('processSTL');
   }
   
+  if (window.Worker) {
+    volumeCm3 = await new Promise((resolve, reject) => {
+      const worker = new Worker('stl-worker.js');
+      worker.onmessage = function(e) {
+        if (e.data.success) {
+          resolve(e.data.volumeCm3);
+        } else {
+          reject(new Error(e.data.error));
+        }
+        worker.terminate();
+      };
+      worker.onerror = function(error) {
+        console.warn('STL worker not found or failed, falling back to main thread:', error);
+        reject(error);
+        worker.terminate();
+      };
+      worker.postMessage(arrayBuffer);
+    }).catch(async (err) => {
+      console.log('Processing STL on main thread due to worker failure');
+      const triangles = await parseBinarySTLAsync(arrayBuffer);
+      return await computeVolumeCm3Async(triangles);
+    });
+  }
+
+  

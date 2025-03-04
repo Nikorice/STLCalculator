@@ -1,4 +1,5 @@
-// stl-worker.js - Web Worker for STL processing (optional if you want to parse in a separate thread)
+// stl-worker.js - Web Worker for STL processing
+
 onmessage = function(e) {
   const arrayBuffer = e.data;
   try {
